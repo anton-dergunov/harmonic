@@ -24,10 +24,14 @@ Optional fast path: in Chrome, enable **Develop → Allow JavaScript from Apple 
 ## Usage
 
 ```bash
-python spotify_liked.py
+python spotify_liked.py              # same as status — prints yes or no
+python spotify_liked.py status
+python spotify_liked.py toggle       # flip liked state; prints new yes or no
+python spotify_liked.py like         # like if needed; prints yes
+python spotify_liked.py unlike       # unlike if needed; prints no
 ```
 
-Prints `yes` or `no` and exits.
+Stdout is always `yes` or `no`; errors go to stderr.
 
 ## How it works
 
