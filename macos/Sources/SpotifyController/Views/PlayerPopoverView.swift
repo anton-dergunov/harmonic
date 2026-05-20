@@ -102,7 +102,9 @@ struct PlayerPopoverView: View {
             Text(playback.artist)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(PlayerTheme.controlForeground)
-                .lineLimit(1)
+                .lineLimit(3)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 14)
 
             Color.clear
@@ -112,14 +114,17 @@ struct PlayerPopoverView: View {
             Text(playback.song)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(PlayerTheme.controlForeground)
-                .lineLimit(2)
+                .lineLimit(3)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 4)
 
             Text(playback.albumSubtitle)
                 .font(.system(size: 11))
                 .foregroundStyle(PlayerTheme.controlForegroundMuted)
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)

@@ -8,6 +8,7 @@ struct SpotifyTrackInfo {
     let albumYear: Int
     let duration: TimeInterval  // seconds
     let artworkURL: String
+    let trackId: String         // Spotify track ID (the part after "spotify:track:")
 }
 
 enum SpotifyPlayerState {
@@ -171,6 +172,8 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         let artist    = info["Artist"] as? String ?? ""
         let album     = info["Album"]  as? String ?? ""
         let durationMs = info["Duration"] as? Double ?? 0
+        let rawURI    = info["Track ID"] as? String ?? ""
+        let trackId   = rawURI.components(separatedBy: ":").last ?? ""
 
         let state: SpotifyPlayerState
         switch stateStr {
@@ -185,7 +188,8 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
                 name: name, artist: artist, album: album,
                 albumYear: 0,
                 duration: durationMs / 1000.0,
-                artworkURL: ""   // follow-up query provides the URL
+                artworkURL: "",  // follow-up query provides the URL
+                trackId: trackId
             ))
             Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 300_000_000)
@@ -209,19 +213,21 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
                 set yr  to "0"
                 set dur to "0"
                 set art to ""
+                set uri to ""
                 try
                     set n   to name   of current track
                     set ar  to artist of current track
                     set al  to album  of current track
                     set yr  to (year     of current track) as string
                     set dur to (duration of current track) as string
+                    set uri to id of current track
                 on error
                 end try
                 try
                     set art to artwork url of current track
                 on error
                 end try
-                return ps & linefeed & (pos as string) & linefeed & n & linefeed & ar & linefeed & al & linefeed & yr & linefeed & dur & linefeed & art
+                return ps & linefeed & (pos as string) & linefeed & n & linefeed & ar & linefeed & al & linefeed & yr & linefeed & dur & linefeed & art & linefeed & uri
             else
                 return "not_running"
             end if
@@ -247,9 +253,11 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         let year     = parts.count > 5 ? Int(parts[5])    ?? 0   : 0
         let rawDur   = parts.count > 6 ? Double(parts[6]) ?? 0.0 : 0.0
         let artURL   = parts.count > 7 ? parts[7] : ""
+        let rawURI   = parts.count > 8 ? parts[8] : ""
 
         // Spotify AppleScript returns duration in seconds; guard against ms format.
         let duration = rawDur > 10_000 ? rawDur / 1000.0 : rawDur
+        let trackId  = rawURI.components(separatedBy: ":").last ?? ""
 
         let state: SpotifyPlayerState
         switch stateStr.lowercased() {
@@ -262,7 +270,8 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         if !name.isEmpty {
             onTrackChanged?(SpotifyTrackInfo(
                 name: name, artist: artist, album: album,
-                albumYear: year, duration: duration, artworkURL: artURL
+                albumYear: year, duration: duration, artworkURL: artURL,
+                trackId: trackId
             ))
         }
     }

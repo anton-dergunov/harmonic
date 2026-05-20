@@ -8,8 +8,13 @@ let package = Package(
         .executable(name: "SpotifyController", targets: ["SpotifyController"]),
     ],
     targets: [
+        .systemLibrary(
+            name: "CCommonCrypto",
+            path: "Sources/CCommonCrypto"
+        ),
         .executableTarget(
             name: "SpotifyController",
+            dependencies: ["CCommonCrypto"],
             path: "Sources/SpotifyController",
             resources: [
                 .process("Resources"),

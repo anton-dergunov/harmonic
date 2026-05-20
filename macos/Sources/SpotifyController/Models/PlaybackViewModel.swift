@@ -28,19 +28,25 @@ final class PlaybackViewModel: ObservableObject {
     // MARK: - Private
 
     private let bridge = SpotifyBridge()
+    private let likeService = SpotifyLikeService()
+
+    private var currentTrackId = ""
 
     private var displayTimer: AnyCancellable?
     private var positionSyncTimer: AnyCancellable?
 
-    // The position Spotify last reported and the wall-clock moment of that report.
-    // The display timer advances `progress` locally from this anchor.
     private var reportedPosition: TimeInterval = 0
     private var reportedAt = Date()
 
-    // Artwork fetch de-duplication: only the most recent request ID wins.
     private var artworkRequestID = 0
-    // URL that was used for the last completed artwork download.
     private var loadedArtworkURL = ""
+    // Artwork URL obtained from the web (like-service fetch); used as step-2 fallback.
+    private var webArtworkURL = ""
+    // Guards against fetching like status twice for the same track.
+    // The initial PlaybackStateChanged notification often carries an empty trackId;
+    // the follow-up fetchAndDispatchState() fills it 0.3 s later with trackChanged=false,
+    // so we must check here rather than only in the trackChanged branch.
+    private var likeStatusFetched = false
 
     // MARK: - Init
 
@@ -91,8 +97,23 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     func toggleLike() {
-        // Placeholder — will be wired to spotify_liked.py approach in a later phase.
-        isLiked.toggle()
+        guard !currentTrackId.isEmpty else { return }
+        // Determine the intended new state from the UI's current display.
+        let wantLiked = !isLiked
+        // Optimistically update UI immediately for responsiveness.
+        isLiked = wantLiked
+
+        let trackId = currentTrackId
+        Task { [weak self] in
+            guard let self else { return }
+            if let actual = await likeService.setLike(trackId: trackId, wantLiked: wantLiked) {
+                // Reconcile: if actual state differs (e.g. was already liked), sync UI.
+                self.isLiked = actual
+            } else {
+                // Request failed — revert optimistic update.
+                self.isLiked = !wantLiked
+            }
+        }
     }
 
     func launchSpotify() { bridge.launchSpotify() }
@@ -121,42 +142,87 @@ final class PlaybackViewModel: ObservableObject {
         if info.albumYear > 0 { albumYear = info.albumYear }
         if info.duration  > 0 { duration  = info.duration  }
 
-        // Decide whether to (re)fetch artwork:
-        // • Track changed → always reset and fetch (previous art no longer relevant).
-        // • Same track, new CDN URL arrived → start a faster CDN download.
-        // • Same track, same URL (or both empty) → nothing to do.
-        let urlChanged = !info.artworkURL.isEmpty && info.artworkURL != loadedArtworkURL
-
         if trackChanged {
+            currentTrackId   = info.trackId
+            isLiked          = false
+            likeStatusFetched = false
+            webArtworkURL    = ""
             loadedArtworkURL = info.artworkURL
-            coverImage = nil
+            coverImage       = nil
             startArtworkFetch(cdnURL: info.artworkURL, artist: info.artist, track: info.name)
-        } else if urlChanged {
-            loadedArtworkURL = info.artworkURL
-            startArtworkFetch(cdnURL: info.artworkURL, artist: info.artist, track: info.name)
+        } else {
+            // Same track — update trackId if we just got it for the first time.
+            if !info.trackId.isEmpty && currentTrackId.isEmpty {
+                currentTrackId = info.trackId
+            }
+
+            let urlChanged = !info.artworkURL.isEmpty && info.artworkURL != loadedArtworkURL
+            if urlChanged {
+                loadedArtworkURL = info.artworkURL
+                startArtworkFetch(cdnURL: info.artworkURL, artist: info.artist, track: info.name)
+            }
+        }
+
+        // Fetch like status whenever we have a non-empty trackId and haven't fetched yet
+        // for this track. Covers both the trackChanged path and the delayed-trackId path.
+        if !currentTrackId.isEmpty && !likeStatusFetched {
+            likeStatusFetched = true
+            fetchLikeStatus(trackId: currentTrackId)
+        }
+    }
+
+    // Fetch like status (and bonus web artwork URL) for the newly-playing track.
+    private func fetchLikeStatus(trackId: String) {
+        guard !trackId.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            guard let result = await likeService.fetchLikeAndArtwork(trackId: trackId) else { return }
+            // Make sure the track hasn't changed while we were fetching.
+            guard self.currentTrackId == trackId else { return }
+            self.isLiked = result.isLiked
+            // Store the web artwork URL for use as a fallback in artwork fetch.
+            if let url = result.artworkURL, !url.isEmpty {
+                self.webArtworkURL = url
+                // If we still don't have a cover image, try this URL now.
+                if self.coverImage == nil {
+                    self.startArtworkFetch(
+                        cdnURL: self.loadedArtworkURL.isEmpty ? url : self.loadedArtworkURL,
+                        webFallbackURL: url,
+                        artist: self.artist,
+                        track: self.song)
+                }
+            }
         }
     }
 
     private func startArtworkFetch(cdnURL: String, artist: String, track: String) {
+        startArtworkFetch(cdnURL: cdnURL, webFallbackURL: webArtworkURL, artist: artist, track: track)
+    }
+
+    private func startArtworkFetch(cdnURL: String, webFallbackURL: String, artist: String, track: String) {
         artworkRequestID += 1
         let id = artworkRequestID
 
         Task { [weak self] in
             guard let self else { return }
 
-            // Primary: Spotify CDN URL (from AppleScript `artwork url of current track`).
             var data: Data?
+
+            // 1. Spotify CDN URL (from AppleScript `artwork url of current track`).
             if !cdnURL.isEmpty {
                 data = await bridge.downloadArtwork(from: cdnURL)
             }
 
-            // Fallback: iTunes Search API — works for virtually all mainstream music,
-            // no API key required. Covers the case where Spotify's AS returns no URL.
+            // 2. Web fallback URL obtained alongside the like-status fetch.
+            if data == nil, !webFallbackURL.isEmpty, webFallbackURL != cdnURL {
+                data = await bridge.downloadArtwork(from: webFallbackURL)
+            }
+
+            // 3. iTunes Search API — works for virtually all mainstream music.
             if data == nil {
                 data = await bridge.searchITunesArtwork(artist: artist, track: track)
             }
 
-            // Discard if a newer request superseded this one.
             guard self.artworkRequestID == id else { return }
             self.coverImage = data.flatMap { NSImage(data: $0) }
         }
@@ -188,8 +254,12 @@ final class PlaybackViewModel: ObservableObject {
         progress         = 0
         reportedPosition = 0
         isPlaying        = false
-        coverImage       = nil
-        loadedArtworkURL = ""
+        isLiked           = false
+        likeStatusFetched = false
+        coverImage        = nil
+        loadedArtworkURL  = ""
+        webArtworkURL     = ""
+        currentTrackId    = ""
     }
 
     private func startDisplayTimer() {
@@ -203,7 +273,6 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     private func startPositionSyncTimer() {
-        // Re-sync with Spotify's actual position every 30 s to correct accumulated drift.
         positionSyncTimer = Timer.publish(every: 30, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
