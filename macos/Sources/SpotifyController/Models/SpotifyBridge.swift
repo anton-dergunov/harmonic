@@ -243,12 +243,7 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         end tell
         """
 
-        guard let output = await osascript(script) else {
-            NSLog("[SpotifyBridge] fetchAndDispatchState: AppleScript returned nil")
-            return
-        }
-
-        NSLog("[SpotifyBridge] raw output: %@", String(output.prefix(300)))
+        guard let output = await osascript(script) else { return }
 
         if output == "not_running" {
             onRunningChanged?(false)
@@ -256,10 +251,7 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         }
 
         let parts    = output.components(separatedBy: "\n")
-        guard parts.count >= 2 else {
-            NSLog("[SpotifyBridge] unexpected part count: %d", parts.count)
-            return
-        }
+        guard parts.count >= 2 else { return }
 
         let stateStr = parts[0]
         let position = Double(parts[1]) ?? 0
@@ -274,8 +266,6 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         // Spotify AppleScript returns duration in milliseconds.
         let duration = rawDur / 1000.0
         let trackId  = rawURI.components(separatedBy: ":").last ?? ""
-
-        NSLog("[SpotifyBridge] parsed: state=%@ pos=%.1f name=%@ rawDur=%.0f duration=%.1f", stateStr, position, name, rawDur, duration)
 
         let state: SpotifyPlayerState
         switch stateStr.lowercased() {

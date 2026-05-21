@@ -135,7 +135,6 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     private func applyTrackInfo(_ info: SpotifyTrackInfo) {
-        NSLog("[PlaybackViewModel] applyTrackInfo: name=%@ duration=%.1f", info.name, info.duration)
         if info.albumYear > 0 { albumYear = info.albumYear }
         if info.duration  > 0 { duration  = info.duration  }
 
@@ -207,7 +206,6 @@ final class PlaybackViewModel: ObservableObject {
     }
 
     private func applyPlayerState(_ state: SpotifyPlayerState) {
-        NSLog("[PlaybackViewModel] applyPlayerState: %@", "\(state)")
         switch state {
         case .playing(let position):
             isPlaying = true
