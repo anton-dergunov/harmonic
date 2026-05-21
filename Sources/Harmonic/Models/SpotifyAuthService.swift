@@ -2,7 +2,6 @@ import AppKit
 import AuthenticationServices
 import CryptoKit
 import Foundation
-import Security
 import SwiftUI
 
 // Optional OAuth path for Spotify Web API (PKCE flow — no client secret required).
@@ -28,7 +27,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        isConnected = loadFromKeychain(key: "refreshToken") != nil
+        isConnected = loadToken(key: "refreshToken") != nil
         if isConnected {
             Task { _ = await getValidToken() }
         }
@@ -88,8 +87,8 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     func disconnect() {
         cachedToken = nil
         tokenExpiry = .distantPast
-        deleteFromKeychain(key: "accessToken")
-        deleteFromKeychain(key: "refreshToken")
+        deleteToken(key: "accessToken")
+        deleteToken(key: "refreshToken")
         isConnected = false
         lastError = nil
     }
@@ -132,7 +131,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     }
 
     private func refreshAccessToken() async -> String? {
-        guard let refresh = loadFromKeychain(key: "refreshToken"), !refresh.isEmpty,
+        guard let refresh = loadToken(key: "refreshToken"), !refresh.isEmpty,
               !clientId.isEmpty else {
             isConnected = false
             return nil
@@ -162,8 +161,8 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     private func storeTokens(access: String, refresh: String, expiresIn: TimeInterval) {
         cachedToken = access
         tokenExpiry = Date().addingTimeInterval(expiresIn)
-        saveToKeychain(value: access,  key: "accessToken")
-        saveToKeychain(value: refresh, key: "refreshToken")
+        saveToken(value: access,  key: "accessToken")
+        saveToken(value: refresh, key: "refreshToken")
     }
 
     // MARK: - Helpers
@@ -182,8 +181,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     }
 
     private func generateCodeVerifier() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let bytes = (0..<32).map { _ in UInt8.random(in: 0...255) }
         return Data(bytes).base64URLEncoded()
     }
 
@@ -191,35 +189,18 @@ final class SpotifyAuthService: NSObject, ObservableObject {
         Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncoded()
     }
 
-    // MARK: - Keychain
+    // MARK: - Token persistence
 
-    private func saveToKeychain(value: String, key: String) {
-        guard let data = value.data(using: .utf8) else { return }
-        let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "Harmonic",
-                                 kSecAttrAccount as String: key]
-        SecItemDelete(q as CFDictionary)
-        var add = q; add[kSecValueData as String] = data
-        SecItemAdd(add as CFDictionary, nil)
+    private func saveToken(value: String, key: String) {
+        UserDefaults.standard.set(value, forKey: "harmonic.oauth.\(key)")
     }
 
-    private func loadFromKeychain(key: String) -> String? {
-        let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "Harmonic",
-                                 kSecAttrAccount as String: key,
-                                 kSecReturnData as String:  true,
-                                 kSecMatchLimit as String:  kSecMatchLimitOne]
-        var result: AnyObject?
-        guard SecItemCopyMatching(q as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+    private func loadToken(key: String) -> String? {
+        UserDefaults.standard.string(forKey: "harmonic.oauth.\(key)")
     }
 
-    private func deleteFromKeychain(key: String) {
-        let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "Harmonic",
-                                 kSecAttrAccount as String: key]
-        SecItemDelete(q as CFDictionary)
+    private func deleteToken(key: String) {
+        UserDefaults.standard.removeObject(forKey: "harmonic.oauth.\(key)")
     }
 }
 
