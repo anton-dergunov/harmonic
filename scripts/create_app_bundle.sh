@@ -17,6 +17,11 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
+# Copy icon if it exists
+if [[ -f "assets/lotus.icns" ]]; then
+    cp "assets/lotus.icns" "$APP_BUNDLE/Contents/Resources/lotus.icns"
+fi
+
 # Create Info.plist
 cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,6 +32,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>$APP_NAME</string>
+    <key>CFBundleIconFile</key>
+    <string>lotus</string>
     <key>CFBundleIdentifier</key>
     <string>com.adergunov.harmonic</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -55,5 +62,20 @@ EOF
 
 # Create PkgInfo
 echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
+
+# Create minimal entitlements for menu bar app
+cat > "/tmp/harmonic.entitlements" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+</dict>
+</plist>
+EOF
+
+# Ad-hoc sign the app (works on the machine it was built on)
+codesign -s - --force --deep --entitlements "/tmp/harmonic.entitlements" "$APP_BUNDLE" 2>/dev/null || true
 
 echo "✓ Created $APP_BUNDLE"
