@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "SpotifyController",
+    name: "Harmonic",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "SpotifyController", targets: ["SpotifyController"]),
+        .executable(name: "Harmonic", targets: ["Harmonic"]),
     ],
     targets: [
         .executableTarget(
-            name: "SpotifyController",
-            path: "Sources/SpotifyController",
+            name: "Harmonic",
+            path: "Sources/Harmonic",
             resources: [
                 .process("Resources"),
             ]

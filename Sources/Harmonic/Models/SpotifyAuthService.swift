@@ -15,7 +15,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     @AppStorage("spotify.oauth.enabled")     var oauthEnabled: Bool   = false
     @AppStorage("spotify.oauth.clientId")    var clientId:     String = ""
-    @AppStorage("spotify.oauth.redirectURI") var redirectURI:  String = "spotifycontroller://callback"
+    @AppStorage("spotify.oauth.redirectURI") var redirectURI:  String = "harmonic://callback"
 
     let scopes = "user-library-read user-library-modify"
 
@@ -196,7 +196,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     private func saveToKeychain(value: String, key: String) {
         guard let data = value.data(using: .utf8) else { return }
         let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "SpotifyController",
+                                 kSecAttrService as String: "Harmonic",
                                  kSecAttrAccount as String: key]
         SecItemDelete(q as CFDictionary)
         var add = q; add[kSecValueData as String] = data
@@ -205,7 +205,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     private func loadFromKeychain(key: String) -> String? {
         let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "SpotifyController",
+                                 kSecAttrService as String: "Harmonic",
                                  kSecAttrAccount as String: key,
                                  kSecReturnData as String:  true,
                                  kSecMatchLimit as String:  kSecMatchLimitOne]
@@ -217,7 +217,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     private func deleteFromKeychain(key: String) {
         let q: [String: Any] = [kSecClass as String:       kSecClassGenericPassword,
-                                 kSecAttrService as String: "SpotifyController",
+                                 kSecAttrService as String: "Harmonic",
                                  kSecAttrAccount as String: key]
         SecItemDelete(q as CFDictionary)
     }

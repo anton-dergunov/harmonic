@@ -31,7 +31,7 @@ final class SettingsWindowController: NSObject {
 
         let hosting = NSHostingController(rootView: root)
         let win = NSWindow(contentViewController: hosting)
-        win.title              = "Spotify Controller Settings"
+        win.title              = "Harmonic Settings"
         win.styleMask          = [.titled, .closable, .miniaturizable]
         win.isReleasedWhenClosed = false
         win.collectionBehavior = [.fullScreenAuxiliary]

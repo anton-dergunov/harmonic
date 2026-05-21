@@ -75,7 +75,7 @@ final class StatusBarController: NSObject {
         menu.addItem(settingsItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
-            title: "Quit Spotify Controller",
+            title: "Quit Harmonic",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))

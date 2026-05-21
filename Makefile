@@ -1,5 +1,22 @@
-# Root Makefile — delegates to the macOS SwiftUI app.
-.PHONY: build run clean debug
+APP_NAME := Harmonic
+CONFIG ?= release
+BUILD_DIR := .build/$(CONFIG)
+BINARY := $(BUILD_DIR)/$(APP_NAME)
 
-build run clean debug:
-	$(MAKE) -C macos $@
+.PHONY: all build run clean debug
+
+all: build
+
+build:
+	swift build -c $(CONFIG)
+
+run: build
+	@echo "Launching $(BINARY)…"
+	@$(BINARY)
+
+clean:
+	swift package clean
+
+debug:
+	$(MAKE) build CONFIG=debug
+	$(MAKE) run CONFIG=debug
