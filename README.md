@@ -1,58 +1,60 @@
-# spotify-controller
+# Harmonic
 
-macOS Spotify helper: a **SwiftUI player UI** (menu bar app later) and a **Python CLI** for liked-state control.
+A minimal, distraction-free Spotify playback controller for macOS. Control your music directly from the menu bar — no clutter, just the essentials.
 
-## macOS app (SwiftUI)
+![Harmonic App Demo](assets/app.png)
 
-Place album art at **`cover.jpg`** in this directory (repo root), then:
+## Features
 
-```bash
-make run
-```
+- **Menu bar player** — Access Spotify controls directly from your macOS menu bar
+- **Quick controls** — Skip tracks, toggle like status, and view current track info at a glance
+- **Borderless popover** — Open a clean 300×300 pt player window with full controls
+- **Smart Spotify integration** — Uses Spotify's official Web API for reliable track management
+- **Minimal design** — Stays out of your way while giving you full control
 
-See [macos/README.md](macos/README.md) and [designs/popover-ui.md](designs/popover-ui.md).
+## Installation
 
----
+### Download and Install
 
-## Python CLI
+1. Download the latest `Harmonic-0.1.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
+2. Double-click to mount the DMG
+3. Drag `Harmonic.app` to your Applications folder
+4. Launch from Applications or Spotlight
 
-CLI tool that prints whether the song currently playing in the **Spotify desktop app** is in your library / liked.
+### First Run
 
-## Requirements
+On first launch, you'll need to authorize Spotify access. Click the settings icon in the player window and follow the OAuth flow to connect your Spotify account.
 
-- macOS with [Spotify](https://www.spotify.com/download/mac/) desktop playing a track
-- A Chromium browser where you are signed in at [open.spotify.com](https://open.spotify.com/) (Chrome, Brave, or Edge)
-- Python 3.10+
+You may also need to grant Accessibility permissions:
+- System Settings → Privacy & Security → Automation
+- Grant terminal/app access to Spotify
 
-## Setup
+## Build Locally
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-```
-
-Grant **Automation** access for your terminal to **Spotify** and **Google Chrome** when macOS prompts you (System Settings → Privacy & Security → Automation).
-
-Optional fast path: in Chrome, enable **Develop → Allow JavaScript from Apple Events** so an already-open track tab can be read without launching headless Chromium.
-
-## Usage
+Requirements:
+- macOS 13+
+- Xcode 15+
+- Swift 5.9+
 
 ```bash
-python spotify_liked.py              # same as status — prints yes or no
-python spotify_liked.py status
-python spotify_liked.py toggle       # flip liked state; prints new yes or no
-python spotify_liked.py like         # like if needed; prints yes
-python spotify_liked.py unlike       # unlike if needed; prints no
+make build      # Build release version
+make run        # Build and run
+make debug      # Build and run debug version
+make clean      # Remove build artifacts
 ```
 
-Stdout is always `yes` or `no`; errors go to stderr.
+The built app is located at `.build/release/Harmonic` (or `.build/debug/Harmonic` for debug builds).
 
-## How it works
+## Architecture
 
-1. Reads the current track ID from the Spotify app via AppleScript.
-2. Opens that track on the Spotify web player using your browser login cookies (no Spotify Developer API).
-3. Reads the save/like button `aria-checked` state on the track page.
+- **SwiftUI menu bar app** — Real-time track info, transport controls, and like/unlike toggle
+- **Spotify OAuth 2.0** — Official authentication for secure API access
+- **System integration** — Runs as a background accessory app with no Dock icon
 
-Errors are written to stderr; stdout is only `yes` or `no`.
+## Prototypes
+
+The `prototypes/` directory contains experimental tools. See [prototypes/README.md](prototypes/README.md) for details.
+
+## License
+
+MIT

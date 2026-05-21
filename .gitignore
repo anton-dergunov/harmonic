@@ -1,5 +1,6 @@
 .venv/
 .build/
+build/
 .swiftpm/
 macos/.build/
 macos/Sources/SpotifyController/Resources/cover.jpg

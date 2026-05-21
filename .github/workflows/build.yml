@@ -1,0 +1,40 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build Swift app
+        run: make build
+
+      - name: Create .app bundle
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          scripts/create_app_bundle.sh "$VERSION"
+
+      - name: Create DMG
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          scripts/create_dmg.sh "$VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/Harmonic-${{ steps.version.outputs.VERSION }}.dmg
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
