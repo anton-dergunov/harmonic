@@ -23,6 +23,20 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 3. Drag `Harmonic.app` to your Applications folder
 4. Launch from Applications or Spotlight
 
+> [!NOTE]
+> Since Harmonic is currently distributed as an unsigned macOS app (not notarized by Apple), macOS may show a warning such as:
+>
+> > “Apple could not verify ‘Harmonic.app’ is free of malware that may harm your Mac or compromise your privacy.”
+>
+> To open the app:
+>
+> 1. Open **System Settings → Privacy & Security**
+> 2. Scroll down to the security warning for Harmonic
+> 3. Click **Open Anyway**
+> 4. Confirm by clicking **Open**
+>
+> After this one-time confirmation, the app will launch normally.
+
 ### First Run
 
 On first launch, you'll need to authorize Spotify access. Click the settings icon in the player window and follow the OAuth flow to connect your Spotify account.
