@@ -33,6 +33,7 @@ final class StatusBarController: NSObject {
             self?.togglePlayerWindow()
         })
         .environmentObject(playback)
+        .environmentObject(MenuBarSettings.shared)
 
         let hostingView = NSHostingView(rootView: menuBarView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
@@ -52,13 +53,21 @@ final class StatusBarController: NSObject {
     }
 
     private func observeSpotifyRunningState() {
+        let mbSettings = MenuBarSettings.shared
+
         playback.$isSpotifyRunning
             .sink { [weak self] running in
-                // 150 pt when showing track info; 32 pt for the icon-only state.
-                self?.statusItem.length = running ? 150 : 32
-                if !running {
-                    self?.hidePlayerWindow()
-                }
+                self?.statusItem.length = running ? CGFloat(mbSettings.itemWidth) : 32
+                if !running { self?.hidePlayerWindow() }
+            }
+            .store(in: &cancellables)
+
+        // React to width changes made in Settings while Spotify is running.
+        mbSettings.$itemWidth
+            .dropFirst()
+            .sink { [weak self] width in
+                guard let self, self.playback.isSpotifyRunning else { return }
+                self.statusItem.length = CGFloat(width)
             }
             .store(in: &cancellables)
     }

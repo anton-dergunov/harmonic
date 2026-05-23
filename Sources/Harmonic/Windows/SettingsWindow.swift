@@ -26,14 +26,17 @@ final class SettingsWindowController: NSObject {
 
         let root = SettingsView()
             .environmentObject(authService)
+            .environmentObject(MenuBarSettings.shared)
 
         let hosting = NSHostingController(rootView: root)
         let win = NSWindow(contentViewController: hosting)
         win.title              = "Harmonic Settings"
-        win.styleMask          = [.titled, .closable, .miniaturizable]
+        win.styleMask          = [.titled, .closable, .miniaturizable, .resizable]
         win.isReleasedWhenClosed = false
         win.collectionBehavior = [.fullScreenAuxiliary]
         win.delegate           = self
+        win.setContentSize(NSSize(width: 580, height: 500))
+        win.minSize            = NSSize(width: 480, height: 380)
         win.center()
         win.makeKeyAndOrderFront(nil)
 
