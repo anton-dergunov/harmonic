@@ -12,6 +12,7 @@ struct Shortcut: Equatable {
     var keyCombo: KeyCombo { KeyCombo(key: key, modifiers: modifiers) }
 
     static let defaultLike = Shortcut(key: .l, modifiers: [.option], displayChar: "L")
+    // No default for player window — users opt in explicitly.
 }
 
 extension NSEvent.ModifierFlags {
@@ -32,18 +33,27 @@ final class HotkeySettings: ObservableObject {
     static let shared = HotkeySettings()
 
     @Published var likeShortcut: Shortcut? {
-        didSet { saveLike(); register() }
+        didSet { saveLike(); registerLike() }
+    }
+
+    @Published var playerWindowShortcut: Shortcut? {
+        didSet { savePlayerWindow(); registerPlayerWindow() }
     }
 
     var likeAction: (() -> Void)?
+    var playerWindowAction: (() -> Void)?
+
     private var likeHotKey: HotKey?
+    private var playerWindowHotKey: HotKey?
 
     private init() {
         likeShortcut = loadLike()
-        register()
+        playerWindowShortcut = loadPlayerWindow()
+        registerLike()
+        registerPlayerWindow()
     }
 
-    private func register() {
+    private func registerLike() {
         likeHotKey = nil
         guard let s = likeShortcut else { return }
         let hk = HotKey(keyCombo: s.keyCombo)
@@ -51,37 +61,76 @@ final class HotkeySettings: ObservableObject {
         likeHotKey = hk
     }
 
+    private func registerPlayerWindow() {
+        playerWindowHotKey = nil
+        guard let s = playerWindowShortcut else { return }
+        let hk = HotKey(keyCombo: s.keyCombo)
+        hk.keyDownHandler = { [weak self] in self?.playerWindowAction?() }
+        playerWindowHotKey = hk
+    }
+
     // MARK: - Persistence
 
     private enum Defaults {
-        static let keyCode  = "hotkey.like.keyCode"
-        static let mods     = "hotkey.like.mods"
-        static let char     = "hotkey.like.char"
-        static let isCustom = "hotkey.like.isCustom"
+        static let likeKeyCode  = "hotkey.like.keyCode"
+        static let likeMods     = "hotkey.like.mods"
+        static let likeChar     = "hotkey.like.char"
+        static let likeIsCustom = "hotkey.like.isCustom"
+
+        static let winKeyCode  = "hotkey.playerWindow.keyCode"
+        static let winMods     = "hotkey.playerWindow.mods"
+        static let winChar     = "hotkey.playerWindow.char"
+        static let winIsSet    = "hotkey.playerWindow.isSet"
     }
 
     private func loadLike() -> Shortcut? {
         let d = UserDefaults.standard
-        guard d.bool(forKey: Defaults.isCustom) else { return .defaultLike }
-        guard d.object(forKey: Defaults.keyCode) != nil else { return nil }
-        let kc   = UInt32(d.integer(forKey: Defaults.keyCode))
-        let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.mods)))
-        let char = d.string(forKey: Defaults.char) ?? "?"
+        guard d.bool(forKey: Defaults.likeIsCustom) else { return .defaultLike }
+        guard d.object(forKey: Defaults.likeKeyCode) != nil else { return nil }
+        let kc   = UInt32(d.integer(forKey: Defaults.likeKeyCode))
+        let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.likeMods)))
+        let char = d.string(forKey: Defaults.likeChar) ?? "?"
         guard let key = Key(carbonKeyCode: kc) else { return .defaultLike }
         return Shortcut(key: key, modifiers: mods, displayChar: char)
     }
 
     private func saveLike() {
         let d = UserDefaults.standard
-        d.set(true, forKey: Defaults.isCustom)
+        d.set(true, forKey: Defaults.likeIsCustom)
         if let s = likeShortcut {
-            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.keyCode)
-            d.set(Int(s.modifiers.rawValue), forKey: Defaults.mods)
-            d.set(s.displayChar, forKey: Defaults.char)
+            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.likeKeyCode)
+            d.set(Int(s.modifiers.rawValue), forKey: Defaults.likeMods)
+            d.set(s.displayChar, forKey: Defaults.likeChar)
         } else {
-            d.removeObject(forKey: Defaults.keyCode)
-            d.removeObject(forKey: Defaults.mods)
-            d.removeObject(forKey: Defaults.char)
+            d.removeObject(forKey: Defaults.likeKeyCode)
+            d.removeObject(forKey: Defaults.likeMods)
+            d.removeObject(forKey: Defaults.likeChar)
+        }
+    }
+
+    private func loadPlayerWindow() -> Shortcut? {
+        let d = UserDefaults.standard
+        guard d.bool(forKey: Defaults.winIsSet),
+              d.object(forKey: Defaults.winKeyCode) != nil else { return nil }
+        let kc   = UInt32(d.integer(forKey: Defaults.winKeyCode))
+        let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.winMods)))
+        let char = d.string(forKey: Defaults.winChar) ?? "?"
+        guard let key = Key(carbonKeyCode: kc) else { return nil }
+        return Shortcut(key: key, modifiers: mods, displayChar: char)
+    }
+
+    private func savePlayerWindow() {
+        let d = UserDefaults.standard
+        if let s = playerWindowShortcut {
+            d.set(true, forKey: Defaults.winIsSet)
+            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.winKeyCode)
+            d.set(Int(s.modifiers.rawValue), forKey: Defaults.winMods)
+            d.set(s.displayChar, forKey: Defaults.winChar)
+        } else {
+            d.set(false, forKey: Defaults.winIsSet)
+            d.removeObject(forKey: Defaults.winKeyCode)
+            d.removeObject(forKey: Defaults.winMods)
+            d.removeObject(forKey: Defaults.winChar)
         }
     }
 }

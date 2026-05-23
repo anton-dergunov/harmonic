@@ -4,15 +4,17 @@ struct SettingsView: View {
     @EnvironmentObject private var auth: SpotifyAuthService
     @EnvironmentObject private var menuBar: MenuBarSettings
     @EnvironmentObject private var hotkeys: HotkeySettings
+    @EnvironmentObject private var logging: LoggingSettings
 
     private enum Tab: Hashable, CaseIterable {
-        case spotify, menuBar, shortcuts
+        case spotify, menuBar, shortcuts, logging
 
         var title: String {
             switch self {
             case .spotify:   "Spotify"
             case .menuBar:   "Menu Bar"
             case .shortcuts: "Shortcuts"
+            case .logging:   "Logging"
             }
         }
 
@@ -21,6 +23,7 @@ struct SettingsView: View {
             case .spotify:   "music.note.list"
             case .menuBar:   "menubar.rectangle"
             case .shortcuts: "keyboard"
+            case .logging:   "doc.text"
             }
         }
     }
@@ -53,6 +56,7 @@ struct SettingsView: View {
         case .spotify:   spotifyContent
         case .menuBar:   menuBarContent
         case .shortcuts: shortcutsContent
+        case .logging:   loggingContent
         }
     }
 
@@ -459,13 +463,80 @@ struct SettingsView: View {
     private var customShortcutsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Custom Shortcuts")
-            HStack(spacing: 8) {
-                Text("Like / Unlike")
-                    .frame(width: 86, alignment: .trailing)
-                    .foregroundStyle(.secondary)
-                KeyRecorderField(shortcut: $hotkeys.likeShortcut)
-                    .frame(width: 140, height: 22)
+            shortcutRow("Like / Unlike",    shortcut: $hotkeys.likeShortcut)
+            shortcutRow("Show / Hide Player", shortcut: $hotkeys.playerWindowShortcut)
+        }
+    }
+
+    @ViewBuilder
+    private func shortcutRow(_ label: String, shortcut: Binding<Shortcut?>) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .frame(width: 110, alignment: .trailing)
+                .foregroundStyle(.secondary)
+            KeyRecorderField(shortcut: shortcut)
+                .frame(width: 140, height: 22)
+        }
+    }
+
+    // MARK: - Logging tab
+
+    private var loggingContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Toggle(isOn: $logging.loggingEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Enable Logging")
+                        .font(.headline)
+                    Text("Appends a JSON Lines record for each song change and like/unlike action.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .toggleStyle(.switch)
+
+            if logging.loggingEnabled {
+                Divider()
+                logFileSection
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                Divider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("When logging is enabled, the Like / Unlike button works even without a Spotify connection. Actions are recorded in the log only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .animation(.easeInOut(duration: 0.2), value: logging.loggingEnabled)
+    }
+
+    private var logFileSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Log File")
+            HStack(spacing: 8) {
+                TextField("Path", text: $logging.logFilePath)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.caption, design: .monospaced))
+                Button("Browse…") { browseLogFile() }
+                    .controlSize(.small)
+            }
+            Text("New events are appended. The file is created if it does not exist.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func browseLogFile() {
+        let panel = NSSavePanel()
+        panel.title = "Choose log file location"
+        panel.nameFieldStringValue = URL(fileURLWithPath: logging.logFilePath).lastPathComponent
+        panel.allowedContentTypes = [.init(filenameExtension: "jsonl")!]
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            logging.logFilePath = url.path
         }
     }
 

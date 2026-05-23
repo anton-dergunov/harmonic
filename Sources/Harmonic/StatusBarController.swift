@@ -27,6 +27,9 @@ final class StatusBarController: NSObject {
         HotkeySettings.shared.likeAction = { [weak self] in
             self?.playback.toggleLike()
         }
+        HotkeySettings.shared.playerWindowAction = { [weak self] in
+            self?.togglePlayerWindow()
+        }
     }
 
     private func setupStatusItem() {

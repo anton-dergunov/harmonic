@@ -55,7 +55,7 @@ struct MenuBarItemView: View {
     // MARK: - Element row
 
     private var trackInfoView: some View {
-        let oauthAvailable = playback.authService.oauthEnabled && playback.authService.isConnected
+        let oauthAvailable = playback.isLikeAvailable
         return HStack(spacing: 0) {
             ForEach(settings.elementOrder) { element in
                 switch element {
@@ -213,6 +213,8 @@ struct MenuBarItemView: View {
             .opacity(oauthAvailable ? (likePressed ? 0.7 : 1.0) : 0.4)
             .scaleEffect(likePressed ? 0.75 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: likePressed)
+            .modifier(ShakeEffect(animatableData: CGFloat(playback.likeShakeCount)))
+            .animation(.linear(duration: 0.4), value: playback.likeShakeCount)
             .frame(maxHeight: .infinity)
             .frame(width: settings.buttonColumnWidth)
             .contentShape(Rectangle())

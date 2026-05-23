@@ -7,9 +7,7 @@ struct PlayerPopoverView: View {
 
     private var controlsVisible: Bool { isHovering }
 
-    private var oauthAvailable: Bool {
-        playback.authService.oauthEnabled && playback.authService.isConnected
-    }
+    private var likeAvailable: Bool { playback.isLikeAvailable }
 
     var body: some View {
         ZStack {
@@ -35,7 +33,7 @@ struct PlayerPopoverView: View {
             }
         }
         .onChange(of: playback.isLiked, perform: { newValue in
-            guard newValue, oauthAvailable else { return }
+            guard newValue, likeAvailable else { return }
             withAnimation(.spring(response: 0.15, dampingFraction: 0.3)) { heartScale = 1.4 }
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 150_000_000)
@@ -85,20 +83,22 @@ struct PlayerPopoverView: View {
     private var topBar: some View {
         HStack {
             ControlIconButton(
-                title: oauthAvailable
+                title: likeAvailable
                     ? (playback.isLiked ? "Remove from Liked Songs" : "Save to Liked Songs")
-                    : "Like unavailable — connect in Settings",
+                    : "Like unavailable — enable Spotify or Logging in Settings",
                 size: PlayerTheme.cornerHitSize
             ) {
-                if oauthAvailable { playback.toggleLike() }
+                if likeAvailable { playback.toggleLike() }
             } label: {
-                Image(systemName: oauthAvailable
+                Image(systemName: likeAvailable
                       ? (playback.isLiked ? "heart.fill" : "heart")
                       : "heart.slash")
                     .font(.system(size: PlayerTheme.utilityIconSize, weight: .medium))
                     .foregroundStyle(PlayerTheme.controlForeground)
                     .scaleEffect(heartScale)
-                    .opacity(oauthAvailable ? 1.0 : 0.45)
+                    .modifier(ShakeEffect(animatableData: CGFloat(playback.likeShakeCount)))
+                    .animation(.linear(duration: 0.4), value: playback.likeShakeCount)
+                    .opacity(likeAvailable ? 1.0 : 0.45)
             }
 
             Spacer()

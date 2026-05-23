@@ -23,11 +23,14 @@ final class PlaybackViewModel: ObservableObject {
 
     @Published var coverImage: NSImage?
     @Published var isSpotifyRunning = false
+    // Incremented on like/unlike failure — views bind ShakeEffect to this value.
+    @Published var likeShakeCount = 0
 
     // MARK: - Private
 
     private let bridge = SpotifyBridge()
     private let likeService = SpotifyLikeService()
+    private let logger = SongLogger()
     let authService = SpotifyAuthService()
 
     private var currentTrackId = ""
@@ -41,6 +44,7 @@ final class PlaybackViewModel: ObservableObject {
     private var displayTimer: AnyCancellable?
     private var positionSyncTimer: AnyCancellable?
     private var authServiceCancellable: AnyCancellable?
+    private var loggingCancellable: AnyCancellable?
 
     private var artworkRequestID = 0
     private var loadedArtworkURL = ""
@@ -52,8 +56,11 @@ final class PlaybackViewModel: ObservableObject {
     init() {
         likeService.authService = authService
         wireBridge()
-        // Forward authService changes so views observing this model update too.
+        // Forward authService and logging changes so views observing this model update too.
         authServiceCancellable = authService.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        loggingCancellable = LoggingSettings.shared.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
         isSpotifyRunning = bridge.isRunning()
@@ -68,6 +75,10 @@ final class PlaybackViewModel: ObservableObject {
 
     var albumSubtitle: String {
         albumYear > 0 ? "\(album) (\(albumYear))" : album
+    }
+
+    var isLikeAvailable: Bool {
+        (authService.oauthEnabled && authService.isConnected) || LoggingSettings.shared.loggingEnabled
     }
 
     var progressFraction: Double {
@@ -98,12 +109,23 @@ final class PlaybackViewModel: ObservableObject {
 
     func toggleLike() {
         guard !currentTrackId.isEmpty else { return }
-        guard authService.oauthEnabled && authService.isConnected else { return }
+        let oauthAvail = authService.oauthEnabled && authService.isConnected
+        let loggingAvail = LoggingSettings.shared.loggingEnabled
+        guard oauthAvail || loggingAvail else { return }
+
         let wantLiked = !isLiked
         isLiked = wantLiked
         likeActionVersion += 1
         let myVersion = likeActionVersion
 
+        if loggingAvail {
+            logger.logLikeToggled(
+                track: song, artist: artist, trackId: currentTrackId,
+                action: wantLiked ? "liked" : "unliked"
+            )
+        }
+
+        guard oauthAvail else { return }
         let trackId = currentTrackId
         Task { [weak self] in
             guard let self else { return }
@@ -113,6 +135,7 @@ final class PlaybackViewModel: ObservableObject {
                 self.isLiked = actual
             } else {
                 self.isLiked = !wantLiked  // revert optimistic update on failure
+                self.likeShakeCount += 1
             }
         }
     }
@@ -147,6 +170,7 @@ final class PlaybackViewModel: ObservableObject {
         artist = info.artist
         album  = info.album
 
+        var shouldLogAfterFetch = false
         if trackChanged {
             currentTrackId    = info.trackId
             isLiked           = false
@@ -154,6 +178,18 @@ final class PlaybackViewModel: ObservableObject {
             loadedArtworkURL  = info.artworkURL
             coverImage        = nil
             startArtworkFetch(cdnURL: info.artworkURL, artist: info.artist, track: info.name)
+            if LoggingSettings.shared.loggingEnabled {
+                let oauthAvail = authService.oauthEnabled && authService.isConnected
+                if oauthAvail {
+                    // Defer logging until fetchLikeStatus resolves so we can include liked status.
+                    shouldLogAfterFetch = true
+                } else {
+                    logger.logSongChanged(
+                        track: info.name, artist: info.artist, album: info.album,
+                        trackId: info.trackId, durationS: Int(info.duration), liked: nil
+                    )
+                }
+            }
         } else {
             if !info.trackId.isEmpty && currentTrackId.isEmpty {
                 currentTrackId = info.trackId
@@ -167,19 +203,25 @@ final class PlaybackViewModel: ObservableObject {
 
         if !currentTrackId.isEmpty && !likeStatusFetched {
             likeStatusFetched = true
-            fetchLikeStatus(trackId: currentTrackId)
+            fetchLikeStatus(trackId: currentTrackId, logOnComplete: shouldLogAfterFetch)
         }
     }
 
-    private func fetchLikeStatus(trackId: String) {
+    private func fetchLikeStatus(trackId: String, logOnComplete: Bool = false) {
         guard !trackId.isEmpty else { return }
         let versionAtStart = likeActionVersion
         Task { [weak self] in
             guard let self else { return }
-            guard let liked = await likeService.fetchLikedStatus(trackId: trackId) else { return }
+            let liked = await likeService.fetchLikedStatus(trackId: trackId)
             guard self.currentTrackId == trackId else { return }
             if self.likeActionVersion == versionAtStart {
-                self.isLiked = liked
+                if let liked { self.isLiked = liked }
+            }
+            if logOnComplete {
+                self.logger.logSongChanged(
+                    track: self.song, artist: self.artist, album: self.album,
+                    trackId: trackId, durationS: Int(self.duration), liked: liked
+                )
             }
         }
     }
