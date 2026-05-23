@@ -24,10 +24,8 @@ final class SettingsWindowController: NSObject {
             return
         }
 
-        let root = SettingsView(onClose: { [weak self] in
-            self?.window?.performClose(nil)
-        })
-        .environmentObject(authService)
+        let root = SettingsView()
+            .environmentObject(authService)
 
         let hosting = NSHostingController(rootView: root)
         let win = NSWindow(contentViewController: hosting)

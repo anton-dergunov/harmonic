@@ -2,29 +2,53 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var auth: SpotifyAuthService
-    var onClose: (() -> Void)? = nil
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            likeSection
-                .padding(.bottom, 20)
+    private enum Tab: Hashable, CaseIterable {
+        case spotify, menuBar
 
-            Divider()
-                .padding(.bottom, 16)
-
-            HStack {
-                Spacer()
-                Button("Done") { onClose?() }
-                    .keyboardShortcut(.defaultAction)
+        var title: String {
+            switch self {
+            case .spotify: "Spotify"
+            case .menuBar: "Menu Bar"
             }
         }
-        .padding(24)
-        .frame(width: 400)
+
+        var icon: String {
+            switch self {
+            case .spotify: "music.note.list"
+            case .menuBar: "menubar.rectangle"
+            }
+        }
     }
 
-    // MARK: - Like / Unlike section
+    @State private var selectedTab: Tab = .spotify
 
-    private var likeSection: some View {
+    var body: some View {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
+            List(Tab.allCases, id: \.self, selection: $selectedTab) { tab in
+                Label(tab.title, systemImage: tab.icon)
+            }
+            .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 160)
+        } detail: {
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(24)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .frame(width: 580, height: 420)
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedTab {
+        case .spotify: spotifyContent
+        case .menuBar: menuBarContent
+        }
+    }
+
+    // MARK: - Spotify tab
+
+    private var spotifyContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             Toggle(isOn: $auth.oauthEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -38,6 +62,7 @@ struct SettingsView: View {
             .toggleStyle(.switch)
 
             if auth.oauthEnabled {
+                Divider()
                 credentialsForm
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -47,11 +72,8 @@ struct SettingsView: View {
 
     private var credentialsForm: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Divider()
-
             field("Client ID",    $auth.clientId)
             field("Redirect URI", $auth.redirectURI)
-
             connectRow
 
             if let err = auth.lastError {
@@ -96,5 +118,12 @@ struct SettingsView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.caption, design: .monospaced))
         }
+    }
+
+    // MARK: - Menu Bar tab (placeholder)
+
+    private var menuBarContent: some View {
+        Text("Menu Bar customization — coming soon.")
+            .foregroundStyle(.secondary)
     }
 }

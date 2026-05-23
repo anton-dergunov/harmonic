@@ -1,60 +1,123 @@
-# Harmonic Prototypes
+# spotify_like.py — Setup & Usage
 
-This directory contains experimental tools and scripts. These are not part of the main app distribution.
+Tracks the currently playing Spotify song and lets you toggle like/unlike —
+**no developer account, no API keys, no Premium, no cookies required.**
 
-## Python CLI: `spotify_liked.py`
+---
 
-A command-line tool that checks and toggles the liked state of the currently playing Spotify track.
+## How it works
 
-### Features
+| Feature | Method |
+|---------|--------|
+| Track change detection | `NSDistributedNotificationCenter` — instant, zero polling |
+| Like state (read) | macOS Accessibility API — reads the heart button's label from Spotify's UI |
+| Like toggle (write) | macOS Accessibility API — programmatically clicks the heart button |
 
-- **Status checking** — Print whether the current track is in your library
-- **Liked state control** — Like, unlike, or toggle the current track
-- **Zero authentication** — Uses browser session cookies instead of Spotify Developer API
+The Spotify desktop app (Electron) exposes its UI through the macOS
+Accessibility tree. The heart/like button has an `AXDescription` of either
+`"Add to Liked Songs"` (not liked) or `"Remove from Liked Songs"` (liked).
+The script reads this to determine state, and clicks it to toggle.
 
-### Requirements
+**This works even when Spotify is minimized** — the Accessibility API queries
+the app's process, not its visual render.
 
-- macOS with [Spotify](https://www.spotify.com/download/mac/) desktop app running
-- A Chromium-based browser (Chrome, Brave, or Edge) signed in at [open.spotify.com](https://open.spotify.com/)
-- Python 3.10+
+---
 
-### Setup
-
-```bash
-# Create virtual environment (once)
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-```
-
-Grant **Automation** access for your terminal to **Spotify** and your browser when macOS prompts you:
-- System Settings → Privacy & Security → Automation
-
-**Optional:** In Chrome, enable **Develop → Allow JavaScript from Apple Events** for faster operation if a track tab is already open.
-
-### Usage
+## Install
 
 ```bash
-python spotify_liked.py              # Print yes or no (default: status)
-python spotify_liked.py status       # Check if current track is liked
-python spotify_liked.py toggle       # Flip liked state and print result
-python spotify_liked.py like         # Like if needed; print yes
-python spotify_liked.py unlike       # Unlike if needed; print no
+pip install pyobjc-framework-Cocoa
 ```
 
-Output is always `yes` or `no` on stdout; errors go to stderr.
+---
 
-### How It Works
+## One-time macOS permission (required)
 
-1. **Get track ID** — Uses AppleScript to read the current track from Spotify
-2. **Open web player** — Navigates to the track on Spotify's web player using your browser cookies
-3. **Read/modify state** — Reads or toggles the like button's `aria-checked` attribute
-4. **No API needed** — Works without registering a Spotify Developer App
+macOS requires you to explicitly grant "Accessibility" access to whatever app
+runs the script (your terminal).
 
-### Exit Codes
+1. Open **System Settings → Privacy & Security → Accessibility**
+2. Click the **+** button
+3. Add your terminal: `Terminal.app`, `iTerm.app`, `Warp.app`, etc.
+4. Toggle it **ON**
 
-- `0` — Success
-- `1` — Error (Spotify not running, no track playing, cookie/browser issues, etc.)
+You only do this once. The script will tell you if it's missing.
 
-See stderr for error details.
+---
+
+## Run
+
+```bash
+python3 spotify_like.py
+```
+
+Start playing something in Spotify first.
+
+---
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| `L` | Toggle like / unlike current track |
+| `Q` | Quit |
+
+---
+
+## What you'll see
+
+```
+═══════════════════════════════════════════════════════
+  Spotify Like Tracker
+  (uses macOS Accessibility — no API keys needed)
+═══════════════════════════════════════════════════════
+
+  ✅ Accessibility permission OK
+  ✅ Ready
+
+  Listening for Spotify track changes...
+
+  ▶  Bohemian Rhapsody  —  Queen
+
+───────────────────────────────────────────────────────
+  ❤️  Bohemian Rhapsody
+       Queen  ·  A Night at the Opera
+───────────────────────────────────────────────────────
+  [L] toggle like   [Q] quit
+
+  ❤️  Liked: Mr. Brightside     ← after pressing L
+```
+
+---
+
+## Limitations
+
+**If the like button isn't found:**
+- Spotify must be open (not just in the Dock/menu bar — the window must exist,
+  even if minimized or behind other windows)
+- The button is only present when a track is actively loaded in the Now Playing bar
+- If Spotify ever significantly redesigns its UI, the button's accessibility label
+  may change — but this is rare and easy to fix (just update the string in the script)
+
+**Accessibility permission:**
+- Your terminal needs to be in System Settings → Accessibility
+- If you switch terminals (e.g. from Terminal.app to iTerm2), add the new one too
+
+---
+
+## Troubleshooting
+
+**"Could not find the like button"**
+1. Is Spotify open with a song loaded in the Now Playing bar?
+2. Is your terminal listed in System Settings → Privacy → Accessibility?
+3. Try clicking on the Spotify window once to make sure it's fully initialized,
+   then run the script again.
+
+**Script crashes on import**
+```bash
+pip install pyobjc-framework-Cocoa
+```
+
+**Like state shows ❓ after song change**
+Normal — it takes ~0.5s for the Accessibility query to run after a track changes.
+If it stays ❓, try pressing L and it will query fresh before toggling.
