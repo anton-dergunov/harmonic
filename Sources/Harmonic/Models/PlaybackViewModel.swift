@@ -148,6 +148,57 @@ final class PlaybackViewModel: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
+    // MARK: - Context menu actions
+
+    private var artistSong: String { "\(artist) – \(song)" }
+
+    // Clipboard
+
+    func copyArtistSong() { copyToPasteboard(artistSong) }
+    func copySong()       { copyToPasteboard(song) }
+    func copyArtist()     { copyToPasteboard(artist) }
+
+    // Open in Spotify (artist/album use the in-app search deep link, since the
+    // AppleScript bridge exposes only names, not URIs)
+
+    func openArtistInSpotify() {
+        guard !artist.isEmpty else { return }
+        openSpotifySearch(artist)
+    }
+
+    func openAlbumInSpotify() {
+        guard !album.isEmpty else { return }
+        // Append the artist to disambiguate — album names are not unique.
+        openSpotifySearch("\(album) \(artist)")
+    }
+
+    // Search in default browser
+
+    func searchGoogleArtistSong() { openGoogleSearch(artistSong) }
+    func searchGoogleArtist()     { openGoogleSearch(artist) }
+
+    // MARK: - Context menu helpers
+
+    private func copyToPasteboard(_ string: String) {
+        guard !string.isEmpty else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(string, forType: .string)
+    }
+
+    private func openSpotifySearch(_ query: String) {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "spotify:search:\(encoded)") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func openGoogleSearch(_ query: String) {
+        guard !query.isEmpty,
+              let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://www.google.com/search?q=\(encoded)") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     // MARK: - Private
 
     private func wireBridge() {

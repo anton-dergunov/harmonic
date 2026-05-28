@@ -122,13 +122,49 @@ final class StatusBarController: NSObject {
         showContextMenu()
     }
 
+    private enum TrackMenuAction: Int {
+        case copyArtistSong, copySong, copyArtist
+        case openTrack, openArtist, openAlbum
+        case searchArtistSong, searchArtist
+    }
+
+    private func trackMenuItem(_ title: String, _ action: TrackMenuAction) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(handleTrackAction(_:)), keyEquivalent: "")
+        item.target = self
+        item.tag = action.rawValue
+        item.isEnabled = !playback.currentTrackId.isEmpty
+        return item
+    }
+
     private func showContextMenu() {
         let menu = NSMenu()
 
-        let openItem = NSMenuItem(title: "Open in Spotify", action: #selector(openInSpotify), keyEquivalent: "")
-        openItem.target = self
-        openItem.isEnabled = !playback.currentTrackId.isEmpty
+        let copyMenu = NSMenu()
+        copyMenu.autoenablesItems = false
+        copyMenu.addItem(trackMenuItem("Artist – Song", .copyArtistSong))
+        copyMenu.addItem(trackMenuItem("Song", .copySong))
+        copyMenu.addItem(trackMenuItem("Artist", .copyArtist))
+        let copyItem = NSMenuItem(title: "Copy", action: nil, keyEquivalent: "")
+        copyItem.submenu = copyMenu
+        menu.addItem(copyItem)
+
+        let openMenu = NSMenu()
+        openMenu.autoenablesItems = false
+        openMenu.addItem(trackMenuItem("Track", .openTrack))
+        openMenu.addItem(trackMenuItem("Artist", .openArtist))
+        openMenu.addItem(trackMenuItem("Album", .openAlbum))
+        let openItem = NSMenuItem(title: "Open in Spotify", action: nil, keyEquivalent: "")
+        openItem.submenu = openMenu
         menu.addItem(openItem)
+
+        let searchMenu = NSMenu()
+        searchMenu.autoenablesItems = false
+        searchMenu.addItem(trackMenuItem("Google: Artist – Song", .searchArtistSong))
+        searchMenu.addItem(trackMenuItem("Google: Artist", .searchArtist))
+        let searchItem = NSMenuItem(title: "Search", action: nil, keyEquivalent: "")
+        searchItem.submenu = searchMenu
+        menu.addItem(searchItem)
+
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -148,8 +184,18 @@ final class StatusBarController: NSObject {
         }
     }
 
-    @objc private func openInSpotify() {
-        playback.openInSpotify()
+    @objc private func handleTrackAction(_ sender: NSMenuItem) {
+        guard let action = TrackMenuAction(rawValue: sender.tag) else { return }
+        switch action {
+        case .copyArtistSong:   playback.copyArtistSong()
+        case .copySong:         playback.copySong()
+        case .copyArtist:       playback.copyArtist()
+        case .openTrack:        playback.openInSpotify()
+        case .openArtist:       playback.openArtistInSpotify()
+        case .openAlbum:        playback.openAlbumInSpotify()
+        case .searchArtistSong: playback.searchGoogleArtistSong()
+        case .searchArtist:     playback.searchGoogleArtist()
+        }
     }
 
     @objc private func openSettings() {
