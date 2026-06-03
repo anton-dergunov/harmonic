@@ -28,6 +28,65 @@ final class SongLogger {
         ])
     }
 
+    func logPlayPause(track: String, artist: String, trackId: String, action: String, positionS: Int) {
+        write([
+            "event": "play_pause",
+            "ts": isoNow(),
+            "track": track,
+            "artist": artist,
+            "track_id": trackId,
+            "action": action,
+            "position_s": positionS,
+        ])
+    }
+
+    func logSkipBackward(track: String, artist: String, trackId: String, positionS: Int) {
+        write([
+            "event": "skip_backward",
+            "ts": isoNow(),
+            "track": track,
+            "artist": artist,
+            "track_id": trackId,
+            "position_s": positionS,
+        ])
+    }
+
+    func logSkipForward(track: String, artist: String, trackId: String, positionS: Int) {
+        write([
+            "event": "skip_forward",
+            "ts": isoNow(),
+            "track": track,
+            "artist": artist,
+            "track_id": trackId,
+            "position_s": positionS,
+        ])
+    }
+
+    func logSeek(track: String, artist: String, trackId: String, fromS: Int, toS: Int) {
+        write([
+            "event": "seek",
+            "ts": isoNow(),
+            "track": track,
+            "artist": artist,
+            "track_id": trackId,
+            "from_position_s": fromS,
+            "to_position_s": toS,
+        ])
+    }
+
+    func logAddedToPlaylist(track: String, artist: String, trackId: String,
+                            playlistId: String, playlistName: String) {
+        write([
+            "event": "added_to_playlist",
+            "ts": isoNow(),
+            "track": track,
+            "artist": artist,
+            "track_id": trackId,
+            "playlist_id": playlistId,
+            "playlist_name": playlistName,
+        ])
+    }
+
     // MARK: - Private
 
     private func isoNow() -> String {

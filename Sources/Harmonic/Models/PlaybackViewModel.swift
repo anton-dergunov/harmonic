@@ -117,15 +117,37 @@ final class PlaybackViewModel: ObservableObject {
             bridge.play()
             isPlaying = true
         }
+        if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
+            logger.logPlayPause(
+                track: song, artist: artist, trackId: currentTrackId,
+                action: isPlaying ? "play" : "pause",
+                positionS: Int(progress)
+            )
+        }
     }
 
-    func skipBackward() { bridge.previousTrack() }
-    func skipForward()  { bridge.nextTrack() }
+    func skipBackward() {
+        if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
+            logger.logSkipBackward(track: song, artist: artist, trackId: currentTrackId, positionS: Int(progress))
+        }
+        bridge.previousTrack()
+    }
+
+    func skipForward() {
+        if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
+            logger.logSkipForward(track: song, artist: artist, trackId: currentTrackId, positionS: Int(progress))
+        }
+        bridge.nextTrack()
+    }
 
     func seek(fraction: Double) {
+        let from = progress
         let target = duration * min(1, max(0, fraction))
         progress = target
         bridge.seek(to: target)
+        if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
+            logger.logSeek(track: song, artist: artist, trackId: currentTrackId, fromS: Int(from), toS: Int(target))
+        }
     }
 
     func toggleLike() {
@@ -198,11 +220,20 @@ final class PlaybackViewModel: ObservableObject {
     func addCurrentTrackToPlaylist(_ playlistId: String) {
         guard !currentTrackId.isEmpty, isPlaylistAvailable else { return }
         let trackId = currentTrackId
+        let playlistName = playlists.first { $0.id == playlistId }?.name ?? ""
+        let shouldLog = LoggingSettings.shared.loggingEnabled
+        let snap = (song: song, artist: artist)
         Task { [weak self] in
             guard let self else { return }
             let ok = await playlistService.addTrack(playlistId: playlistId, trackId: trackId)
             if ok {
                 self.playlistAddStatus = .added
+                if shouldLog {
+                    self.logger.logAddedToPlaylist(
+                        track: snap.song, artist: snap.artist, trackId: trackId,
+                        playlistId: playlistId, playlistName: playlistName
+                    )
+                }
             } else {
                 self.playlistAddStatus = .failed
                 self.playlistShakeCount += 1

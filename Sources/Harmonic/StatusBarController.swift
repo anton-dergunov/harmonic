@@ -140,6 +140,47 @@ final class StatusBarController: NSObject {
 
     private func showContextMenu() {
         let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        // ── Controls group ────────────────────────────────────────
+        let hasTrack = !playback.currentTrackId.isEmpty
+        menu.addItem(controlItem(
+            "⏮  Previous",
+            symbol: "backward.end.fill",
+            action: #selector(handlePrev),
+            enabled: hasTrack
+        ))
+        menu.addItem(controlItem(
+            playback.isPlaying ? "⏸  Pause" : "▶  Play",
+            symbol: playback.isPlaying ? "pause.fill" : "play.fill",
+            action: #selector(handlePlayPause),
+            enabled: hasTrack
+        ))
+        menu.addItem(controlItem(
+            "⏭  Skip Forward",
+            symbol: "forward.end.fill",
+            action: #selector(handleNext),
+            enabled: hasTrack
+        ))
+
+        let likeItem = controlItem(
+            playback.isLiked ? "Unlike" : "Like",
+            symbol: playback.isLiked ? "heart.fill" : "heart",
+            action: #selector(handleLike),
+            enabled: hasTrack && playback.isLikeAvailable
+        )
+        if let shortcut = HotkeySettings.shared.likeShortcut {
+            likeItem.keyEquivalent = shortcut.displayChar.lowercased()
+            likeItem.keyEquivalentModifierMask = shortcut.modifiers
+        }
+        menu.addItem(likeItem)
+
+        if playback.isPlaylistAvailable {
+            menu.addItem(buildAddToPlaylistItem())
+        }
+
+        // ── Track actions group ───────────────────────────────────
+        menu.addItem(.separator())
 
         let copyMenu = NSMenu()
         copyMenu.autoenablesItems = false
@@ -167,10 +208,6 @@ final class StatusBarController: NSObject {
         searchItem.submenu = searchMenu
         menu.addItem(searchItem)
 
-        if playback.isPlaylistAvailable {
-            menu.addItem(buildAddToPlaylistItem())
-        }
-
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -188,6 +225,18 @@ final class StatusBarController: NSObject {
         DispatchQueue.main.async { [weak self] in
             self?.statusItem.menu = nil
         }
+    }
+
+    private func controlItem(_ title: String, symbol: String, action: Selector,
+                              enabled: Bool) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.isEnabled = enabled
+        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
+            img.isTemplate = true
+            item.image = img
+        }
+        return item
     }
 
     private func buildAddToPlaylistItem() -> NSMenuItem {
@@ -239,6 +288,11 @@ final class StatusBarController: NSObject {
     @objc private func handleRefreshPlaylists() {
         playback.refreshPlaylists()
     }
+
+    @objc private func handlePlayPause() { playback.togglePlayPause() }
+    @objc private func handleNext()      { playback.skipForward() }
+    @objc private func handlePrev()      { playback.skipBackward() }
+    @objc private func handleLike()      { playback.toggleLike() }
 
     @objc private func handleTrackAction(_ sender: NSMenuItem) {
         guard let action = TrackMenuAction(rawValue: sender.tag) else { return }
