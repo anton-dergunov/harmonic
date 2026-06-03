@@ -276,6 +276,10 @@ final class StatusBarController: NSObject {
         submenu.addItem(refresh)
 
         let item = NSMenuItem(title: "Add to playlist", action: nil, keyEquivalent: "")
+        if let img = NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: nil) {
+            img.isTemplate = true
+            item.image = img
+        }
         item.submenu = submenu
         return item
     }
