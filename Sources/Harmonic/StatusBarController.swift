@@ -189,6 +189,7 @@ final class StatusBarController: NSObject {
         copyMenu.addItem(trackMenuItem("Artist", .copyArtist))
         let copyItem = NSMenuItem(title: "Copy", action: nil, keyEquivalent: "")
         copyItem.submenu = copyMenu
+        menuIcon(copyItem, symbol: "doc.on.doc")
         menu.addItem(copyItem)
 
         let openMenu = NSMenu()
@@ -198,6 +199,7 @@ final class StatusBarController: NSObject {
         openMenu.addItem(trackMenuItem("Album", .openAlbum))
         let openItem = NSMenuItem(title: "Open in Spotify", action: nil, keyEquivalent: "")
         openItem.submenu = openMenu
+        menuIcon(openItem, symbol: "arrow.up.right.square")
         menu.addItem(openItem)
 
         let searchMenu = NSMenu()
@@ -206,24 +208,35 @@ final class StatusBarController: NSObject {
         searchMenu.addItem(trackMenuItem("Google: Artist", .searchArtist))
         let searchItem = NSMenuItem(title: "Search", action: nil, keyEquivalent: "")
         searchItem.submenu = searchMenu
+        menuIcon(searchItem, symbol: "magnifyingglass")
         menu.addItem(searchItem)
 
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
+        menuIcon(settingsItem, symbol: "gearshape")
         menu.addItem(settingsItem)
         menu.addItem(.separator())
 
-        menu.addItem(NSMenuItem(
+        let quitItem = NSMenuItem(
             title: "Quit Harmonic",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        ))
+        )
+        menuIcon(quitItem, symbol: "power")
+        menu.addItem(quitItem)
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         DispatchQueue.main.async { [weak self] in
             self?.statusItem.menu = nil
+        }
+    }
+
+    private func menuIcon(_ item: NSMenuItem, symbol: String) {
+        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
+            img.isTemplate = true
+            item.image = img
         }
     }
 
@@ -232,10 +245,7 @@ final class StatusBarController: NSObject {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         item.isEnabled = enabled
-        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
-            img.isTemplate = true
-            item.image = img
-        }
+        menuIcon(item, symbol: symbol)
         return item
     }
 
@@ -276,10 +286,7 @@ final class StatusBarController: NSObject {
         submenu.addItem(refresh)
 
         let item = NSMenuItem(title: "Add to playlist", action: nil, keyEquivalent: "")
-        if let img = NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: nil) {
-            img.isTemplate = true
-            item.image = img
-        }
+        menuIcon(item, symbol: "text.badge.plus")
         item.submenu = submenu
         return item
     }
