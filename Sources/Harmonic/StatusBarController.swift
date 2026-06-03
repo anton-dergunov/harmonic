@@ -145,19 +145,19 @@ final class StatusBarController: NSObject {
         // ── Controls group ────────────────────────────────────────
         let hasTrack = !playback.currentTrackId.isEmpty
         menu.addItem(controlItem(
-            "⏮  Previous",
+            "Previous",
             symbol: "backward.end.fill",
             action: #selector(handlePrev),
             enabled: hasTrack
         ))
         menu.addItem(controlItem(
-            playback.isPlaying ? "⏸  Pause" : "▶  Play",
+            playback.isPlaying ? "Pause" : "Play",
             symbol: playback.isPlaying ? "pause.fill" : "play.fill",
             action: #selector(handlePlayPause),
             enabled: hasTrack
         ))
         menu.addItem(controlItem(
-            "⏭  Skip Forward",
+            "Skip Forward",
             symbol: "forward.end.fill",
             action: #selector(handleNext),
             enabled: hasTrack
