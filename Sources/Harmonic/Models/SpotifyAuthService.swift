@@ -16,7 +16,7 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     @AppStorage("spotify.oauth.clientId")    var clientId:     String = ""
     @AppStorage("spotify.oauth.redirectURI") var redirectURI:  String = "harmonic://callback"
 
-    let scopes = "user-library-read user-library-modify"
+    let scopes = "user-library-read user-library-modify playlist-read-private playlist-modify-private playlist-modify-public"
 
     @Published var isConnected     = false
     @Published var isAuthenticating = false

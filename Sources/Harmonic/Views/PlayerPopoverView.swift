@@ -134,6 +134,11 @@ struct PlayerPopoverView: View {
 
             Spacer()
 
+            if playback.isPlaylistAvailable {
+                playlistMenu
+                Spacer()
+            }
+
             ControlIconButton(title: "Settings", size: PlayerTheme.cornerHitSize) {
                 SettingsWindowController.shared.show(authService: playback.authService)
             } label: {
@@ -142,6 +147,37 @@ struct PlayerPopoverView: View {
                     .foregroundStyle(PlayerTheme.controlForeground)
             }
         }
+        .onAppear { playback.loadPlaylistsIfNeeded() }
+    }
+
+    private var playlistMenu: some View {
+        Menu {
+            let lists = playback.addablePlaylists
+            if lists.isEmpty {
+                Text(playback.playlistsLoaded ? "No playlists" : "Loading…")
+            } else {
+                ForEach(lists) { pl in
+                    Button(pl.name) { playback.addCurrentTrackToPlaylist(pl.id) }
+                }
+            }
+            Divider()
+            Button("Refresh playlists") { playback.refreshPlaylists() }
+        } label: {
+            Image(systemName: playback.playlistAddStatus == .added
+                  ? "checkmark"
+                  : "text.badge.plus")
+                .font(.system(size: PlayerTheme.utilityIconSize, weight: .medium))
+                .foregroundStyle(PlayerTheme.controlForeground)
+                .frame(width: PlayerTheme.cornerHitSize, height: PlayerTheme.cornerHitSize)
+                .contentShape(Rectangle())
+                .modifier(ShakeEffect(animatableData: CGFloat(playback.playlistShakeCount)))
+                .animation(.linear(duration: 0.4), value: playback.playlistShakeCount)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: PlayerTheme.cornerHitSize, height: PlayerTheme.cornerHitSize)
+        .disabled(playback.currentTrackId.isEmpty)
+        .accessibilityLabel("Add to playlist")
     }
 
     private var centerBlock: some View {

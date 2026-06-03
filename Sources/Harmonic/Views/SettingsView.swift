@@ -107,9 +107,9 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Toggle(isOn: $auth.oauthEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Enable Like / Unlike")
+                    Text("Enable Like / Unlike & Playlists")
                         .font(.headline)
-                    Text("Connect a Spotify Developer App to like or unlike tracks.")
+                    Text("Connect a Spotify Developer App to like or unlike tracks and add songs to playlists.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -130,6 +130,13 @@ struct SettingsView: View {
             field("Client ID",    $auth.clientId)
             field("Redirect URI", $auth.redirectURI)
             connectRow
+
+            if auth.isConnected {
+                Text("Adding songs to playlists needs the playlist permission. If it isn’t working, Disconnect and Connect again to grant it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let err = auth.lastError {
                 Text(err)

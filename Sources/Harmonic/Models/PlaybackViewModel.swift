@@ -26,10 +26,24 @@ final class PlaybackViewModel: ObservableObject {
     // Incremented on like/unlike failure — views bind ShakeEffect to this value.
     @Published var likeShakeCount = 0
 
+    // MARK: - Playlists
+
+    // Cached list of the user's playlists, shared by both UI surfaces (popover
+    // button and right-click submenu). Loaded once per session; manual refresh.
+    @Published private(set) var playlists: [SpotifyPlaylist] = []
+    @Published private(set) var playlistsLoaded = false
+    // Transient feedback for the most recent add-to-playlist action.
+    @Published var playlistAddStatus: PlaylistAddStatus = .idle
+    // Incremented on add failure — the popover button binds ShakeEffect to this.
+    @Published var playlistShakeCount = 0
+
+    enum PlaylistAddStatus: Equatable { case idle, added, failed }
+
     // MARK: - Private
 
     private let bridge = SpotifyBridge()
     private let likeService = SpotifyLikeService()
+    private let playlistService = SpotifyPlaylistService()
     private let logger = SongLogger()
     let authService = SpotifyAuthService()
 
@@ -55,6 +69,8 @@ final class PlaybackViewModel: ObservableObject {
 
     init() {
         likeService.authService = authService
+        playlistService.authService = authService
+        playlists = Self.loadCachedPlaylists()
         wireBridge()
         // Forward authService and logging changes so views observing this model update too.
         authServiceCancellable = authService.objectWillChange.sink { [weak self] _ in
@@ -79,6 +95,11 @@ final class PlaybackViewModel: ObservableObject {
 
     var isLikeAvailable: Bool {
         (authService.oauthEnabled && authService.isConnected) || LoggingSettings.shared.loggingEnabled
+    }
+
+    // Adding to a playlist requires a live OAuth connection (logging-only is not enough).
+    var isPlaylistAvailable: Bool {
+        authService.oauthEnabled && authService.isConnected
     }
 
     var progressFraction: Double {
@@ -146,6 +167,64 @@ final class PlaybackViewModel: ObservableObject {
         guard !currentTrackId.isEmpty,
               let url = URL(string: "spotify:track:\(currentTrackId)") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - Playlists
+
+    // Writable playlists shown to the user (own or collaborative).
+    var addablePlaylists: [SpotifyPlaylist] {
+        playlists.filter { $0.isOwn }
+    }
+
+    /// Fetch playlists once per session. Safe to call on every popover open /
+    /// context-menu show; the `playlistsLoaded` guard keeps it to one network call.
+    func loadPlaylistsIfNeeded() {
+        guard isPlaylistAvailable, !playlistsLoaded else { return }
+        refreshPlaylists()
+    }
+
+    func refreshPlaylists() {
+        guard isPlaylistAvailable else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            if let fetched = await playlistService.fetchPlaylists() {
+                self.playlists = fetched
+                self.playlistsLoaded = true
+                Self.saveCachedPlaylists(fetched)
+            }
+        }
+    }
+
+    func addCurrentTrackToPlaylist(_ playlistId: String) {
+        guard !currentTrackId.isEmpty, isPlaylistAvailable else { return }
+        let trackId = currentTrackId
+        Task { [weak self] in
+            guard let self else { return }
+            let ok = await playlistService.addTrack(playlistId: playlistId, trackId: trackId)
+            if ok {
+                self.playlistAddStatus = .added
+            } else {
+                self.playlistAddStatus = .failed
+                self.playlistShakeCount += 1
+            }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if self.playlistAddStatus != .idle { self.playlistAddStatus = .idle }
+        }
+    }
+
+    // MARK: - Playlist cache (UserDefaults)
+
+    private static let playlistsCacheKey = "harmonic.playlists.cache"
+
+    private static func loadCachedPlaylists() -> [SpotifyPlaylist] {
+        guard let data = UserDefaults.standard.data(forKey: playlistsCacheKey),
+              let list = try? JSONDecoder().decode([SpotifyPlaylist].self, from: data) else { return [] }
+        return list
+    }
+
+    private static func saveCachedPlaylists(_ list: [SpotifyPlaylist]) {
+        guard let data = try? JSONEncoder().encode(list) else { return }
+        UserDefaults.standard.set(data, forKey: playlistsCacheKey)
     }
 
     // MARK: - Context menu actions

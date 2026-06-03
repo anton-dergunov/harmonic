@@ -119,6 +119,8 @@ final class StatusBarController: NSObject {
 
     @objc private func handleButtonAction(_ sender: NSStatusBarButton) {
         guard NSApp.currentEvent?.type == .rightMouseUp else { return }
+        // Warm the playlist cache so the submenu has data to show.
+        playback.loadPlaylistsIfNeeded()
         showContextMenu()
     }
 
@@ -165,6 +167,10 @@ final class StatusBarController: NSObject {
         searchItem.submenu = searchMenu
         menu.addItem(searchItem)
 
+        if playback.isPlaylistAvailable {
+            menu.addItem(buildAddToPlaylistItem())
+        }
+
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -182,6 +188,56 @@ final class StatusBarController: NSObject {
         DispatchQueue.main.async { [weak self] in
             self?.statusItem.menu = nil
         }
+    }
+
+    private func buildAddToPlaylistItem() -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+
+        let lists = playback.addablePlaylists
+        if lists.isEmpty {
+            let placeholder = NSMenuItem(
+                title: playback.playlistsLoaded ? "No playlists" : "Loading…",
+                action: nil, keyEquivalent: ""
+            )
+            placeholder.isEnabled = false
+            submenu.addItem(placeholder)
+        } else {
+            let trackAvailable = !playback.currentTrackId.isEmpty
+            for pl in lists {
+                let item = NSMenuItem(
+                    title: pl.name,
+                    action: #selector(handleAddToPlaylist(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = pl.id
+                item.isEnabled = trackAvailable
+                submenu.addItem(item)
+            }
+        }
+
+        submenu.addItem(.separator())
+        let refresh = NSMenuItem(
+            title: "Refresh playlists",
+            action: #selector(handleRefreshPlaylists),
+            keyEquivalent: ""
+        )
+        refresh.target = self
+        submenu.addItem(refresh)
+
+        let item = NSMenuItem(title: "Add to playlist", action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    @objc private func handleAddToPlaylist(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        playback.addCurrentTrackToPlaylist(id)
+    }
+
+    @objc private func handleRefreshPlaylists() {
+        playback.refreshPlaylists()
     }
 
     @objc private func handleTrackAction(_ sender: NSMenuItem) {
