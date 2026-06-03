@@ -10,6 +10,7 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 
 - **Menu bar track info** — See artist and song name at a glance without switching apps
 - **Like / unlike** — Save or remove the current track from your Liked Songs with one click
+- **Add to playlist** — Add the current song to any of your Spotify playlists from the player window or right-click menu
 - **Skip forward** — Jump ahead in a track directly from the menu bar
 - **Player window** — Click the track info to open a full player with cover art, scrub bar, and transport controls
 - **Customizable menu bar** — Choose which controls appear in the menu bar strip
@@ -17,13 +18,13 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 - **Launch at Login** — Start Harmonic automatically when you log in
 - **Open in Spotify** — Jump to the current track, artist, or album in the Spotify app from the player or right-click menu
 - **Copy & search** — Right-click to copy the artist/song to the clipboard or look them up on Google
-- **Song logging** — Optionally keep a local log of your listening history
+- **Song logging** — Optionally keep a local log of your listening history, including play/pause, skips, seeks, and playlist adds
 
 ## Installation
 
 ### Download and Install
 
-1. Download the latest `Harmonic-0.3.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
+1. Download the latest `Harmonic-0.4.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
 2. Double-click to mount the DMG
 3. Drag `Harmonic.app` to your Applications folder
 4. Launch from Applications or Spotlight

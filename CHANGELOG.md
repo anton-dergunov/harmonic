@@ -4,6 +4,14 @@ All notable changes to Harmonic are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-03
+
+### Harmonic v0.4.0 - Playlists & Richer Controls
+
+- **Add to playlist** — add the current song to any of your Spotify playlists directly from the player window or the right-click menu
+- **Playback controls in right-click menu** — play/pause, previous, skip forward, like/unlike, and add-to-playlist are now available from the status-bar context menu
+- **Action logging** — when song logging is enabled, Harmonic now also records play/pause, skip, seek, and add-to-playlist actions with timestamps
+
 ## [0.3.0] - 2026-05-28
 
 ### Harmonic v0.3.0 - Richer Right-Click Menu
