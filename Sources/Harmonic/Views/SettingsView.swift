@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var hotkeys: HotkeySettings
     @EnvironmentObject private var logging: LoggingSettings
     @EnvironmentObject private var router: SettingsRouter
+    @EnvironmentObject private var playlistSettings: RecentPlaylistSettings
 
     enum Tab: Hashable, CaseIterable {
         case general, spotify, menuBar, shortcuts, logging, about
@@ -120,9 +121,25 @@ struct SettingsView: View {
                 Divider()
                 credentialsForm
                     .transition(.opacity.combined(with: .move(edge: .top)))
+
+                if auth.isConnected {
+                    Divider()
+                    Toggle(isOn: $playlistSettings.likeWhenAdding) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Like track when adding to playlist")
+                                .font(.headline)
+                            Text("Automatically likes the song whenever you add it to a playlist, unless it's already liked.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: auth.oauthEnabled)
+        .animation(.easeInOut(duration: 0.2), value: auth.isConnected)
     }
 
     private var credentialsForm: some View {
@@ -513,6 +530,7 @@ struct SettingsView: View {
             SectionHeader(title: "Custom Shortcuts")
             shortcutRow("Like / Unlike",    shortcut: $hotkeys.likeShortcut)
             shortcutRow("Show / Hide Player", shortcut: $hotkeys.playerWindowShortcut)
+            shortcutRow("Add to Playlist",  shortcut: $hotkeys.addToPlaylistShortcut)
         }
     }
 

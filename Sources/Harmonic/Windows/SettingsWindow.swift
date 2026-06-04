@@ -36,6 +36,7 @@ final class SettingsWindowController: NSObject {
             .environmentObject(HotkeySettings.shared)
             .environmentObject(LoggingSettings.shared)
             .environmentObject(SettingsRouter.shared)
+            .environmentObject(RecentPlaylistSettings.shared)
 
         let hosting = NSHostingController(rootView: root)
         let win = NSWindow(contentViewController: hosting)

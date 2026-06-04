@@ -157,7 +157,7 @@ struct PlayerPopoverView: View {
                 Text(playback.playlistsLoaded ? "No playlists" : "Loading…")
             } else {
                 ForEach(lists) { pl in
-                    Button(pl.name) { playback.addCurrentTrackToPlaylist(pl.id) }
+                    Button(pl.name) { playback.addCurrentTrackToPlaylistWithTracking(pl.id) }
                 }
             }
             Divider()

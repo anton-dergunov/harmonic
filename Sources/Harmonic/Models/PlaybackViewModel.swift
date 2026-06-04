@@ -196,6 +196,7 @@ final class PlaybackViewModel: ObservableObject {
     // Writable playlists shown to the user (own or collaborative).
     var addablePlaylists: [SpotifyPlaylist] {
         playlists.filter { $0.isOwn }
+                  .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// Fetch playlists once per session. Safe to call on every popover open /
@@ -234,6 +235,11 @@ final class PlaybackViewModel: ObservableObject {
                         playlistId: playlistId, playlistName: playlistName
                     )
                 }
+                if RecentPlaylistSettings.shared.likeWhenAdding && !self.isLiked {
+                    if await self.likeService.setLike(trackId: trackId, wantLiked: true) != nil {
+                        self.isLiked = true
+                    }
+                }
             } else {
                 self.playlistAddStatus = .failed
                 self.playlistShakeCount += 1
@@ -241,6 +247,11 @@ final class PlaybackViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             if self.playlistAddStatus != .idle { self.playlistAddStatus = .idle }
         }
+    }
+
+    func addCurrentTrackToPlaylistWithTracking(_ playlistId: String) {
+        addCurrentTrackToPlaylist(playlistId)
+        RecentPlaylistSettings.shared.recentPlaylistId = playlistId
     }
 
     // MARK: - Playlist cache (UserDefaults)

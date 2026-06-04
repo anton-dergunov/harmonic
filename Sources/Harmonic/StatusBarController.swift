@@ -6,6 +6,7 @@ import SwiftUI
 final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private var playerWindow: PlayerWindow?
+    private var quickAddWindow: QuickAddToPlaylistWindow?
     let playback = PlaybackViewModel()
 
     // Global monitor fires for mouse events delivered to OTHER apps, giving
@@ -30,6 +31,9 @@ final class StatusBarController: NSObject {
         }
         HotkeySettings.shared.playerWindowAction = { [weak self] in
             self?.togglePlayerWindow()
+        }
+        HotkeySettings.shared.addToPlaylistAction = { [weak self] in
+            self?.showQuickAddDialog()
         }
     }
 
@@ -293,7 +297,7 @@ final class StatusBarController: NSObject {
 
     @objc private func handleAddToPlaylist(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
-        playback.addCurrentTrackToPlaylist(id)
+        playback.addCurrentTrackToPlaylistWithTracking(id)
     }
 
     @objc private func handleRefreshPlaylists() {
@@ -389,6 +393,30 @@ final class StatusBarController: NSObject {
             globalEventMonitor = nil
         }
     }
+
+    private func showQuickAddDialog() {
+        playback.loadPlaylistsIfNeeded()
+
+        if let window = quickAddWindow, window.isVisible {
+            window.orderFront(self)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = QuickAddToPlaylistWindow(playback: playback)
+        quickAddWindow = window
+
+        let screenFrame = NSScreen.main?.frame ?? .zero
+        let windowSize = window.frame.size
+        let x = (screenFrame.width - windowSize.width) / 2
+        let y = screenFrame.height * 0.25
+
+        window.setFrameOrigin(NSPoint(x: x, y: y))
+        window.makeKeyAndOrderFront(self)
+        NSApp.activate(ignoringOtherApps: true)
+
+        window.delegate = self
+    }
 }
 
 extension StatusBarController: NSWindowDelegate {
@@ -396,7 +424,12 @@ extension StatusBarController: NSWindowDelegate {
     // that shifts focus without generating a mouse-down in another app.
     nonisolated func windowDidResignKey(_ notification: Notification) {
         Task { @MainActor in
-            hidePlayerWindow()
+            if (notification.object as? NSWindow) === quickAddWindow {
+                quickAddWindow?.close()
+                quickAddWindow = nil
+            } else {
+                hidePlayerWindow()
+            }
         }
     }
 }

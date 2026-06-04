@@ -4,6 +4,15 @@ All notable changes to Harmonic are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-04
+
+### Harmonic v0.5.0 - Quick-Add Playlist Hotkey
+
+- **Quick-add to playlist** — press ⌥⌘A from any app to open a searchable playlist picker; type to filter, press Enter or click to add the current track instantly
+- **Alphabetical playlist order** — playlists are now sorted A–Z in all menus and the picker dialog
+- **Like when adding to playlist** — new toggle in Settings → Spotify that automatically likes the track whenever you add it to a playlist (skips if already liked)
+- **Configurable Add-to-Playlist hotkey** — the new shortcut is adjustable in Settings → Shortcuts alongside the existing Like and Player Window shortcuts
+
 ## [0.4.0] - 2026-06-03
 
 ### Harmonic v0.4.0 - Playlists & Richer Controls
