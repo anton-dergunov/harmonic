@@ -175,6 +175,7 @@ struct PlayerPopoverView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .foregroundStyle(PlayerTheme.controlForeground)
         .frame(width: PlayerTheme.cornerHitSize, height: PlayerTheme.cornerHitSize)
         .disabled(playback.currentTrackId.isEmpty)
         .accessibilityLabel("Add to playlist")
