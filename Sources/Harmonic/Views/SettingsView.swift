@@ -8,6 +8,8 @@ struct SettingsView: View {
     @EnvironmentObject private var logging: LoggingSettings
     @EnvironmentObject private var router: SettingsRouter
     @EnvironmentObject private var playlistSettings: RecentPlaylistSettings
+    @EnvironmentObject private var updateSettings: UpdateSettings
+    @EnvironmentObject private var updateService: UpdateService
 
     enum Tab: Hashable, CaseIterable {
         case general, spotify, menuBar, shortcuts, logging, about
@@ -98,7 +100,78 @@ struct SettingsView: View {
                 }
             }
             .toggleStyle(.switch)
+
+            Divider()
+
+            updatesSection
+
             Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Updates")
+                .font(.headline)
+
+            Toggle(isOn: $updateSettings.autoCheck) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Check for updates automatically")
+                    Text("Checks once a day for new releases on GitHub.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Toggle(isOn: $updateSettings.autoInstall) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Install updates automatically")
+                    Text("Downloads and applies updates silently; still prompts before restarting.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .disabled(!updateSettings.autoCheck)
+
+            HStack(spacing: 12) {
+                Button(updateService.isChecking ? "Checking…" : "Check Now") {
+                    let shiftHeld = NSApp.currentEvent?.modifierFlags.contains(.shift) == true
+                    Task { await updateService.checkForUpdates(force: true, forceAnyVersion: shiftHeld) }
+                }
+                .disabled(updateService.isChecking || updateService.isInstalling)
+                .help("Hold ⇧ Shift to force the update dialog regardless of version (for testing)")
+
+                if updateService.isInstalling {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(width: 16, height: 16)
+                    Text("Installing…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let release = updateService.updateAvailable {
+                    HStack(spacing: 6) {
+                        Text("Harmonic \(release.version) is available")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Button("Update Now") {
+                            updateService.installUpdate()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                } else if let msg = updateService.statusMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let date = updateSettings.lastCheckDate {
+                    Text("Last checked: \(date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

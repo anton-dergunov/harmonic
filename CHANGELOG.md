@@ -1,8 +1,12 @@
 # Changelog
 
-All notable changes to Harmonic are documented in this file.
+## [0.6.0] - 2026-06-05
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Harmonic v0.6.0 - Auto-Update
+
+- **Auto-update** — Harmonic can now check for and install new versions directly from within the app. When an update is found, a dialog shows the full release notes and lets you install with one click. Updates installed this way skip the Gatekeeper security warning you normally see when installing manually from a downloaded file. Options to enable automatic daily checking and automatic silent installation are in Settings → General, along with a "Check Now" button
+- **Fixed**: The quick-add playlist dialog (⌥⌘A) no longer opens when Spotify is not connected
+- **Fixed**: After closing the quick-add playlist dialog, focus now correctly returns to the app you were previously working in
 
 ## [0.5.0] - 2026-06-04
 
@@ -52,3 +56,7 @@ The first release of Harmonic, a minimal Spotify controller that lives in your m
 - **Skip forward** - jump ahead in a track directly from the menu bar
 - **Player window** - see album art and control playback
 - **Spotify connection** - connect your Spotify account once through Settings; Harmonic handles the rest
+
+---
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

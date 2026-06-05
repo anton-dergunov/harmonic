@@ -18,12 +18,13 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 - **Open in Spotify** — Jump to the current track, artist, or album in the Spotify app from the player or right-click menu
 - **Copy & search** — Right-click to copy the artist/song to the clipboard or look them up on Google
 - **Song logging** — Optionally keep a local log of your listening history, including play/pause, skips, seeks, and playlist adds
+- **Auto-update** — Check for new versions on launch or once a day and install them in-app; subsequent updates skip the Gatekeeper security prompt you see when installing manually
 
 ## Installation
 
 ### Download and Install
 
-1. Download the latest `Harmonic-0.5.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
+1. Download the latest `Harmonic-0.6.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
 2. Double-click to mount the DMG
 3. Drag `Harmonic.app` to your Applications folder
 4. Launch from Applications or Spotlight
@@ -40,7 +41,7 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 > 3. Click **Open Anyway**
 > 4. Confirm by clicking **Open**
 >
-> After this one-time confirmation, the app will launch normally.
+> After this one-time confirmation, the app will launch normally. Once Harmonic is running, its built-in auto-update feature installs future versions without triggering this prompt again.
 
 ### First Run
 

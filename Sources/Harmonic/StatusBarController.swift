@@ -19,6 +19,7 @@ final class StatusBarController: NSObject {
     private var lastHideTime: TimeInterval = 0
 
     private var cancellables = Set<AnyCancellable>()
+    private var previousApp: NSRunningApplication?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: 150)
@@ -33,7 +34,8 @@ final class StatusBarController: NSObject {
             self?.togglePlayerWindow()
         }
         HotkeySettings.shared.addToPlaylistAction = { [weak self] in
-            self?.showQuickAddDialog()
+            guard let self, self.playback.isPlaylistAvailable else { return }
+            self.showQuickAddDialog()
         }
     }
 
@@ -412,6 +414,7 @@ final class StatusBarController: NSObject {
         let y = screenFrame.height * 0.25
 
         window.setFrameOrigin(NSPoint(x: x, y: y))
+        previousApp = NSWorkspace.shared.frontmostApplication
         window.makeKeyAndOrderFront(self)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -427,6 +430,8 @@ extension StatusBarController: NSWindowDelegate {
             if (notification.object as? NSWindow) === quickAddWindow {
                 quickAddWindow?.close()
                 quickAddWindow = nil
+                previousApp?.activate(options: .activateIgnoringOtherApps)
+                previousApp = nil
             } else {
                 hidePlayerWindow()
             }
