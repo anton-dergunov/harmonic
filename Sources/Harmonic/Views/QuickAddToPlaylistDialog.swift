@@ -65,6 +65,23 @@ struct QuickAddToPlaylistDialog: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
             Spacer()
+            Button(action: { playback.refreshPlaylists() }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(Circle())
+                    .rotationEffect(.degrees(playback.isLoadingPlaylists ? 360 : 0))
+                    .animation(
+                        playback.isLoadingPlaylists
+                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                            : .default,
+                        value: playback.isLoadingPlaylists
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(playback.isLoadingPlaylists)
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))

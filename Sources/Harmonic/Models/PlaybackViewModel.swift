@@ -32,6 +32,7 @@ final class PlaybackViewModel: ObservableObject {
     // button and right-click submenu). Loaded once per session; manual refresh.
     @Published private(set) var playlists: [SpotifyPlaylist] = []
     @Published private(set) var playlistsLoaded = false
+    @Published private(set) var isLoadingPlaylists = false
     // Transient feedback for the most recent add-to-playlist action.
     @Published var playlistAddStatus: PlaylistAddStatus = .idle
     // Incremented on add failure — the popover button binds ShakeEffect to this.
@@ -208,6 +209,7 @@ final class PlaybackViewModel: ObservableObject {
 
     func refreshPlaylists() {
         guard isPlaylistAvailable else { return }
+        isLoadingPlaylists = true
         Task { [weak self] in
             guard let self else { return }
             if let fetched = await playlistService.fetchPlaylists() {
@@ -215,6 +217,7 @@ final class PlaybackViewModel: ObservableObject {
                 self.playlistsLoaded = true
                 Self.saveCachedPlaylists(fetched)
             }
+            self.isLoadingPlaylists = false
         }
     }
 
