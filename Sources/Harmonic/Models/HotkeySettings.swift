@@ -1,19 +1,17 @@
 import AppKit
-import HotKey
 
-// A global keyboard shortcut: a key + modifiers + the display character (e.g. "L").
+// A global keyboard shortcut: a Carbon key code + modifiers + the display character (e.g. "L").
 struct Shortcut: Equatable {
-    let key: Key
+    let carbonKeyCode: UInt32
     let modifiers: NSEvent.ModifierFlags
     let displayChar: String
 
     var displayString: String { modifiers.glyphs + displayChar }
 
-    var keyCombo: KeyCombo { KeyCombo(key: key, modifiers: modifiers) }
-
-    static let defaultLike = Shortcut(key: .l, modifiers: [.option], displayChar: "L")
+    // kVK_ANSI_L = 0x25 (37), kVK_ANSI_A = 0x00 (0)
+    static let defaultLike = Shortcut(carbonKeyCode: 37, modifiers: [.option], displayChar: "L")
     // No default for player window — users opt in explicitly.
-    static let defaultAddToPlaylist = Shortcut(key: .a, modifiers: [.option, .command], displayChar: "A")
+    static let defaultAddToPlaylist = Shortcut(carbonKeyCode: 0, modifiers: [.option, .command], displayChar: "A")
 }
 
 extension NSEvent.ModifierFlags {
@@ -49,9 +47,9 @@ final class HotkeySettings: ObservableObject {
     var playerWindowAction: (() -> Void)?
     var addToPlaylistAction: (() -> Void)?
 
-    private var likeHotKey: HotKey?
-    private var playerWindowHotKey: HotKey?
-    private var addToPlaylistHotKey: HotKey?
+    private var likeHotKey: GlobalHotKey?
+    private var playerWindowHotKey: GlobalHotKey?
+    private var addToPlaylistHotKey: GlobalHotKey?
 
     private init() {
         likeShortcut = loadLike()
@@ -65,7 +63,7 @@ final class HotkeySettings: ObservableObject {
     private func registerLike() {
         likeHotKey = nil
         guard let s = likeShortcut else { return }
-        let hk = HotKey(keyCombo: s.keyCombo)
+        let hk = GlobalHotKey(carbonKeyCode: s.carbonKeyCode, modifiers: s.modifiers)
         hk.keyDownHandler = { [weak self] in self?.likeAction?() }
         likeHotKey = hk
     }
@@ -73,7 +71,7 @@ final class HotkeySettings: ObservableObject {
     private func registerPlayerWindow() {
         playerWindowHotKey = nil
         guard let s = playerWindowShortcut else { return }
-        let hk = HotKey(keyCombo: s.keyCombo)
+        let hk = GlobalHotKey(carbonKeyCode: s.carbonKeyCode, modifiers: s.modifiers)
         hk.keyDownHandler = { [weak self] in self?.playerWindowAction?() }
         playerWindowHotKey = hk
     }
@@ -81,7 +79,7 @@ final class HotkeySettings: ObservableObject {
     private func registerAddToPlaylist() {
         addToPlaylistHotKey = nil
         guard let s = addToPlaylistShortcut else { return }
-        let hk = HotKey(keyCombo: s.keyCombo)
+        let hk = GlobalHotKey(carbonKeyCode: s.carbonKeyCode, modifiers: s.modifiers)
         hk.keyDownHandler = { [weak self] in self?.addToPlaylistAction?() }
         addToPlaylistHotKey = hk
     }
@@ -112,15 +110,14 @@ final class HotkeySettings: ObservableObject {
         let kc   = UInt32(d.integer(forKey: Defaults.likeKeyCode))
         let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.likeMods)))
         let char = d.string(forKey: Defaults.likeChar) ?? "?"
-        guard let key = Key(carbonKeyCode: kc) else { return .defaultLike }
-        return Shortcut(key: key, modifiers: mods, displayChar: char)
+        return Shortcut(carbonKeyCode: kc, modifiers: mods, displayChar: char)
     }
 
     private func saveLike() {
         let d = UserDefaults.standard
         d.set(true, forKey: Defaults.likeIsCustom)
         if let s = likeShortcut {
-            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.likeKeyCode)
+            d.set(Int(s.carbonKeyCode), forKey: Defaults.likeKeyCode)
             d.set(Int(s.modifiers.rawValue), forKey: Defaults.likeMods)
             d.set(s.displayChar, forKey: Defaults.likeChar)
         } else {
@@ -137,15 +134,14 @@ final class HotkeySettings: ObservableObject {
         let kc   = UInt32(d.integer(forKey: Defaults.winKeyCode))
         let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.winMods)))
         let char = d.string(forKey: Defaults.winChar) ?? "?"
-        guard let key = Key(carbonKeyCode: kc) else { return nil }
-        return Shortcut(key: key, modifiers: mods, displayChar: char)
+        return Shortcut(carbonKeyCode: kc, modifiers: mods, displayChar: char)
     }
 
     private func savePlayerWindow() {
         let d = UserDefaults.standard
         if let s = playerWindowShortcut {
             d.set(true, forKey: Defaults.winIsSet)
-            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.winKeyCode)
+            d.set(Int(s.carbonKeyCode), forKey: Defaults.winKeyCode)
             d.set(Int(s.modifiers.rawValue), forKey: Defaults.winMods)
             d.set(s.displayChar, forKey: Defaults.winChar)
         } else {
@@ -163,15 +159,14 @@ final class HotkeySettings: ObservableObject {
         let kc   = UInt32(d.integer(forKey: Defaults.addToPlaylistKeyCode))
         let mods = NSEvent.ModifierFlags(rawValue: UInt(d.integer(forKey: Defaults.addToPlaylistMods)))
         let char = d.string(forKey: Defaults.addToPlaylistChar) ?? "?"
-        guard let key = Key(carbonKeyCode: kc) else { return .defaultAddToPlaylist }
-        return Shortcut(key: key, modifiers: mods, displayChar: char)
+        return Shortcut(carbonKeyCode: kc, modifiers: mods, displayChar: char)
     }
 
     private func saveAddToPlaylist() {
         let d = UserDefaults.standard
         d.set(true, forKey: Defaults.addToPlaylistIsCustom)
         if let s = addToPlaylistShortcut {
-            d.set(Int(s.key.carbonKeyCode), forKey: Defaults.addToPlaylistKeyCode)
+            d.set(Int(s.carbonKeyCode), forKey: Defaults.addToPlaylistKeyCode)
             d.set(Int(s.modifiers.rawValue), forKey: Defaults.addToPlaylistMods)
             d.set(s.displayChar, forKey: Defaults.addToPlaylistChar)
         } else {

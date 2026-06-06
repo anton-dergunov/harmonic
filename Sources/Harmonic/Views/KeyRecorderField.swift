@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import HotKey
 
 // SwiftUI wrapper for a click-to-record keyboard shortcut field.
 struct KeyRecorderField: NSViewRepresentable {
@@ -64,10 +63,9 @@ final class KeyRecorderNSView: NSView {
             return
         }
         let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
-        guard !mods.isEmpty,
-              let key = Key(carbonKeyCode: UInt32(event.keyCode)) else { return }
+        guard !mods.isEmpty else { return }
         let char = (event.charactersIgnoringModifiers ?? "?").prefix(1).uppercased()
-        let s = Shortcut(key: key, modifiers: mods, displayChar: String(char))
+        let s = Shortcut(carbonKeyCode: UInt32(event.keyCode), modifiers: mods, displayChar: String(char))
         currentShortcut = s
         isRecording = false
         onChange?(s)

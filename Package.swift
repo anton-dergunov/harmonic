@@ -7,13 +7,11 @@ let package = Package(
     products: [
         .executable(name: "Harmonic", targets: ["Harmonic"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/soffes/HotKey", from: "0.1.0"),
-    ],
+    dependencies: [],
     targets: [
         .executableTarget(
             name: "Harmonic",
-            dependencies: ["HotKey"],
+            dependencies: [],
             path: "Sources/Harmonic",
             resources: [
                 .process("Resources"),
