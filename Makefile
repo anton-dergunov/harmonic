@@ -1,5 +1,5 @@
 APP_NAME := Harmonic
-VERSION := 0.1.0
+VERSION := 0.6.1
 CONFIG ?= release
 BUILD_DIR := .build/$(CONFIG)
 BINARY := $(BUILD_DIR)/$(APP_NAME)

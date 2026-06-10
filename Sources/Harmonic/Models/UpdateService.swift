@@ -49,8 +49,7 @@ final class UpdateService: NSObject, ObservableObject {
     // True when the app is running from a source build with no proper version string.
     // Dev builds should never receive automatic update prompts.
     var isDevVersion: Bool {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        return v == nil || v == "Development"
+        AppVersion.isDevBuild
     }
 
     func checkOnLaunchIfNeeded() {

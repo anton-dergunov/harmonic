@@ -24,7 +24,7 @@ A minimal, distraction-free Spotify playback controller for macOS. Control your 
 
 ### Download and Install
 
-1. Download the latest `Harmonic-0.6.0.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
+1. Download the latest `Harmonic-0.6.1.dmg` from [Releases](https://github.com/anton-dergunov/harmonic/releases)
 2. Double-click to mount the DMG
 3. Drag `Harmonic.app` to your Applications folder
 4. Launch from Applications or Spotlight

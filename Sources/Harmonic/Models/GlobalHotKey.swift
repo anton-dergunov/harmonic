@@ -4,7 +4,14 @@ import Carbon
 // Global hotkey registration via the Carbon Event Manager (RegisterEventHotKey).
 // Does not require the Accessibility permission.
 final class GlobalHotKey {
-    fileprivate static var registry: [UInt32: GlobalHotKey] = [:]
+    // Holds weak references only — a strong-reference registry would keep every
+    // GlobalHotKey alive forever, preventing deinit (and UnregisterEventHotKey)
+    // from ever running when a hotkey is replaced or cleared.
+    fileprivate final class WeakBox {
+        weak var value: GlobalHotKey?
+        init(_ value: GlobalHotKey) { self.value = value }
+    }
+    fileprivate static var registry: [UInt32: WeakBox] = [:]
     private static var eventHandlerRef: EventHandlerRef?
     private static var nextID: UInt32 = 1
     private static let signature: FourCharCode = 0x48726D4E  // "HrmN"
@@ -16,7 +23,7 @@ final class GlobalHotKey {
     init(carbonKeyCode: UInt32, modifiers: NSEvent.ModifierFlags) {
         id = Self.nextID
         Self.nextID += 1
-        Self.registry[id] = self
+        Self.registry[id] = WeakBox(self)
         Self.ensureEventHandler()
 
         let hkID = EventHotKeyID(signature: Self.signature, id: id)
@@ -47,7 +54,7 @@ private func globalHotKeyHandler(_: EventHandlerCallRef?,
     GetEventParameter(event, UInt32(kEventParamDirectObject),
                       UInt32(typeEventHotKeyID), nil,
                       MemoryLayout<EventHotKeyID>.size, nil, &hkID)
-    GlobalHotKey.registry[hkID.id]?.keyDownHandler?()
+    GlobalHotKey.registry[hkID.id]?.value?.keyDownHandler?()
     return noErr
 }
 

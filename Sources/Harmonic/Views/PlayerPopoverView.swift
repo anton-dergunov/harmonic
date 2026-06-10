@@ -153,7 +153,9 @@ struct PlayerPopoverView: View {
     private var playlistMenu: some View {
         Menu {
             let lists = playback.addablePlaylists
-            if lists.isEmpty {
+            if playback.isLoadingPlaylists {
+                Text("Loading…")
+            } else if lists.isEmpty {
                 Text(playback.playlistsLoaded ? "No playlists" : "Loading…")
             } else {
                 ForEach(lists) { pl in

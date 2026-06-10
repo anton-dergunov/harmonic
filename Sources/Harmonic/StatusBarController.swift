@@ -260,11 +260,12 @@ final class StatusBarController: NSObject {
         submenu.autoenablesItems = false
 
         let lists = playback.addablePlaylists
-        if lists.isEmpty {
-            let placeholder = NSMenuItem(
-                title: playback.playlistsLoaded ? "No playlists" : "Loading…",
-                action: nil, keyEquivalent: ""
-            )
+        if playback.isLoadingPlaylists {
+            let placeholder = NSMenuItem(title: "Loading…", action: nil, keyEquivalent: "")
+            placeholder.isEnabled = false
+            submenu.addItem(placeholder)
+        } else if lists.isEmpty {
+            let placeholder = NSMenuItem(title: "No playlists", action: nil, keyEquivalent: "")
             placeholder.isEnabled = false
             submenu.addItem(placeholder)
         } else {

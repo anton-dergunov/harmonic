@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1] - 2026-06-10
+
+### Harmonic v0.6.1 - Playlist Refresh Improvements & Shortcut Fix
+
+- **Playlist lists no longer show stale entries while refreshing** — the right-click menu, player popover, and quick-add dialog now show "Loading…" while fetching your playlists instead of the old list
+- **New "Refresh playlists" button** in the quick-add playlist dialog (⌥⌘A) to manually reload your playlist list
+- **Fixed**: clearing or changing a custom keyboard shortcut in Settings could leave the old shortcut active, occasionally causing it to keep triggering its action and producing system beeps on launch
+
 ## [0.6.0] - 2026-06-05
 
 ### Harmonic v0.6.0 - Auto-Update

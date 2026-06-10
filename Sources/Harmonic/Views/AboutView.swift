@@ -8,7 +8,7 @@ struct AboutView: View {
     private static let repoURL  = URL(string: "https://github.com/anton-dergunov/harmonic")!
 
     private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Development"
+        AppVersion.displayString
     }
 
     var body: some View {

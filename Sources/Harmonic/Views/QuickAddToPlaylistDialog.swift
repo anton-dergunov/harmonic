@@ -8,8 +8,9 @@ enum Layout {
     static let trackInfo: CGFloat = 78
     static let search: CGFloat    = 38
     static let listMax: CGFloat   = 230
+    static let footer: CGFloat    = 28
     // Total height equals the window height set in QuickAddToPlaylistWindow.
-    static var total: CGFloat { appBar + 1 + trackInfo + 1 + search + 1 + listMax }
+    static var total: CGFloat { appBar + 1 + trackInfo + 1 + search + 1 + listMax + 1 + footer }
 }
 
 struct QuickAddToPlaylistDialog: View {
@@ -37,6 +38,8 @@ struct QuickAddToPlaylistDialog: View {
             searchBar
             Divider()
             listSection
+            Divider()
+            footer
         }
         .frame(width: Layout.width, height: Layout.total)
         .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
@@ -65,23 +68,6 @@ struct QuickAddToPlaylistDialog: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
             Spacer()
-            Button(action: { playback.refreshPlaylists() }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18, height: 18)
-                    .background(Color.primary.opacity(0.08))
-                    .clipShape(Circle())
-                    .rotationEffect(.degrees(playback.isLoadingPlaylists ? 360 : 0))
-                    .animation(
-                        playback.isLoadingPlaylists
-                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
-                            : .default,
-                        value: playback.isLoadingPlaylists
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(playback.isLoadingPlaylists)
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
@@ -162,7 +148,13 @@ struct QuickAddToPlaylistDialog: View {
     private var listSection: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                if filteredPlaylists.isEmpty {
+                if playback.isLoadingPlaylists {
+                    Text("Loading…")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                } else if filteredPlaylists.isEmpty {
                     Text(playlists.isEmpty ? "No playlists available" : "No matches")
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
@@ -181,6 +173,32 @@ struct QuickAddToPlaylistDialog: View {
             .padding(.vertical, 4)
         }
         .frame(height: Layout.listMax)
+    }
+
+    private var footer: some View {
+        HStack {
+            Spacer()
+            Button(action: { playback.refreshPlaylists() }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .semibold))
+                        .rotationEffect(.degrees(playback.isLoadingPlaylists ? 360 : 0))
+                        .animation(
+                            playback.isLoadingPlaylists
+                                ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                                : .default,
+                            value: playback.isLoadingPlaylists
+                        )
+                    Text("Refresh playlists")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(playback.isLoadingPlaylists)
+            Spacer()
+        }
+        .frame(height: Layout.footer)
     }
 
     // MARK: - Actions
