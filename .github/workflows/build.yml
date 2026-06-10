@@ -32,11 +32,24 @@ jobs:
           VERSION=${{ steps.version.outputs.VERSION }}
           scripts/create_dmg.sh "$VERSION"
 
+      - name: Extract changelog section
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          awk -v ver="$VERSION" '
+            /^## \[/{
+              if (found) exit
+              if ($0 ~ ("\\[" ver "\\]")) { found=1; next }
+              next
+            }
+            /^---/{ if (found) exit }
+            found { print }
+          ' CHANGELOG.md > release_notes.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: build/Harmonic-${{ steps.version.outputs.VERSION }}.dmg
-          body_path: CHANGELOG.md
+          body_path: release_notes.md
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
