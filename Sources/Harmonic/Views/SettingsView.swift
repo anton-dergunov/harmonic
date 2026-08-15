@@ -640,7 +640,7 @@ struct SettingsView: View {
 
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("When logging is enabled, the Like / Unlike button works even without a Spotify connection. Actions are recorded in the log only.")
+                    Text("When logging is enabled, the Like / Unlike button works even without a Spotify connection. Actions are recorded in the log only, and the heart shows a small mark to indicate that.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -662,9 +662,15 @@ struct SettingsView: View {
                 Button("Browse…") { browseLogFile() }
                     .controlSize(.small)
             }
-            Text("New events are appended. The file is created if it does not exist.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if logging.logFilePath.trimmingCharacters(in: .whitespaces).isEmpty {
+                Label("Choose a file — nothing is recorded until then.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Text("New events are appended. The file is created if it does not exist.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 

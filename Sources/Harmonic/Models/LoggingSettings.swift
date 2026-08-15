@@ -12,6 +12,12 @@ final class LoggingSettings: ObservableObject {
         didSet { UserDefaults.standard.set(logFilePath, forKey: "logging.filePath") }
     }
 
+    // Logging is only useful when a destination file is actually set — an empty
+    // path means SongLogger silently drops every line.
+    var isUsable: Bool {
+        loggingEnabled && !logFilePath.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     private init() {
         loggingEnabled = UserDefaults.standard.bool(forKey: "logging.enabled")
         logFilePath = UserDefaults.standard.string(forKey: "logging.filePath") ?? LoggingSettings.defaultPath

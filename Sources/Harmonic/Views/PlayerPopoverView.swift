@@ -7,7 +7,21 @@ struct PlayerPopoverView: View {
 
     private var controlsVisible: Bool { isHovering }
 
+    private var likeMode: PlaybackViewModel.LikeMode { playback.likeMode }
     private var likeAvailable: Bool { playback.isLikeAvailable }
+
+    private var likeTooltip: String {
+        switch likeMode {
+        case .spotify:
+            return playback.isLiked ? "Remove from Liked Songs" : "Save to Liked Songs"
+        case .logOnly:
+            return playback.isLiked
+                ? "Remove from log only — Spotify not connected"
+                : "Save to log only — Spotify not connected"
+        case .unavailable:
+            return "Like unavailable — connect Spotify, or enable Logging with a file path, in Settings"
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -102,18 +116,18 @@ struct PlayerPopoverView: View {
     private var topBar: some View {
         HStack {
             ControlIconButton(
-                title: likeAvailable
-                    ? (playback.isLiked ? "Remove from Liked Songs" : "Save to Liked Songs")
-                    : "Like unavailable — enable Spotify or Logging in Settings",
+                title: likeTooltip,
                 size: PlayerTheme.cornerHitSize
             ) {
                 if likeAvailable { playback.toggleLike() }
             } label: {
-                Image(systemName: likeAvailable
-                      ? (playback.isLiked ? "heart.fill" : "heart")
-                      : "heart.slash")
-                    .font(.system(size: PlayerTheme.utilityIconSize, weight: .medium))
-                    .foregroundStyle(PlayerTheme.controlForeground)
+                LikeGlyph(
+                    mode: likeMode,
+                    isLiked: playback.isLiked,
+                    size: PlayerTheme.utilityIconSize,
+                    color: PlayerTheme.controlForeground,
+                    badgeColor: PlayerTheme.controlForeground
+                )
                     .scaleEffect(heartScale)
                     .modifier(ShakeEffect(animatableData: CGFloat(playback.likeShakeCount)))
                     .animation(.linear(duration: 0.4), value: playback.likeShakeCount)

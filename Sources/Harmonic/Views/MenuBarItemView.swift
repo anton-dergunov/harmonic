@@ -55,7 +55,7 @@ struct MenuBarItemView: View {
     // MARK: - Element row
 
     private var trackInfoView: some View {
-        let oauthAvailable = playback.isLikeAvailable
+        let likeMode = playback.likeMode
         return HStack(spacing: 0) {
             ForEach(settings.elementOrder) { element in
                 switch element {
@@ -70,7 +70,7 @@ struct MenuBarItemView: View {
                 case .nextTrack:
                     if settings.showNextTrack        { nextTrackColumn }
                 case .like:
-                    if settings.showLikeButton       { likeColumn(oauthAvailable: oauthAvailable) }
+                    if settings.showLikeButton       { likeColumn(mode: likeMode) }
                 }
             }
         }
@@ -199,18 +199,17 @@ struct MenuBarItemView: View {
             .accessibilityAddTraits(.isButton)
     }
 
-    private func likeColumn(oauthAvailable: Bool) -> some View {
-        Image(systemName: oauthAvailable
-              ? (playback.isLiked ? "heart.fill" : "heart")
-              : "heart.slash")
-            .font(.system(size: settings.buttonIconSize, weight: .medium))
-            .foregroundStyle(
-                // White when actively liked — gives a clear "selected" signal regardless of chosen color.
-                playback.isLiked && oauthAvailable
-                    ? Color.white
-                    : settings.effectiveForeground
-            )
-            .opacity(oauthAvailable ? (likePressed ? 0.7 : 1.0) : 0.4)
+    private func likeColumn(mode: PlaybackViewModel.LikeMode) -> some View {
+        let available = mode != .unavailable
+        return LikeGlyph(
+            mode: mode,
+            isLiked: playback.isLiked,
+            size: settings.buttonIconSize,
+            // White when actively liked — gives a clear "selected" signal regardless of chosen color.
+            color: playback.isLiked && available ? Color.white : settings.effectiveForeground,
+            badgeColor: settings.effectiveForeground
+        )
+            .opacity(available ? (likePressed ? 0.7 : 1.0) : 0.4)
             .scaleEffect(likePressed ? 0.75 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: likePressed)
             .modifier(ShakeEffect(animatableData: CGFloat(playback.likeShakeCount)))
@@ -221,11 +220,17 @@ struct MenuBarItemView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .updating($likePressed) { _, state, _ in state = true }
-                    .onEnded { _ in if oauthAvailable { playback.toggleLike() } }
+                    .onEnded { _ in if available { playback.toggleLike() } }
             )
-            .accessibilityLabel(
-                oauthAvailable ? (playback.isLiked ? "Unlike" : "Like") : "Like unavailable"
-            )
+            .accessibilityLabel(likeAccessibilityLabel(mode: mode))
             .accessibilityAddTraits(.isButton)
+    }
+
+    private func likeAccessibilityLabel(mode: PlaybackViewModel.LikeMode) -> String {
+        switch mode {
+        case .spotify:     return playback.isLiked ? "Unlike" : "Like"
+        case .logOnly:     return playback.isLiked ? "Unlike (log only)" : "Like (log only)"
+        case .unavailable: return "Like unavailable"
+        }
     }
 }

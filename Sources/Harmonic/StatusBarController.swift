@@ -169,8 +169,9 @@ final class StatusBarController: NSObject {
             enabled: hasTrack
         ))
 
+        let likeSuffix = playback.likeMode == .logOnly ? " (log only)" : ""
         let likeItem = controlItem(
-            playback.isLiked ? "Unlike" : "Like",
+            (playback.isLiked ? "Unlike" : "Like") + likeSuffix,
             symbol: playback.isLiked ? "heart.fill" : "heart",
             action: #selector(handleLike),
             enabled: hasTrack && playback.isLikeAvailable

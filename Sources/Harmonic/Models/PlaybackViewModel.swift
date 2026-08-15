@@ -40,6 +40,10 @@ final class PlaybackViewModel: ObservableObject {
 
     enum PlaylistAddStatus: Equatable { case idle, added, failed }
 
+    // Where a like/unlike actually goes. `.logOnly` means Spotify is not
+    // connected, so the action is recorded in the local log and nowhere else.
+    enum LikeMode: Equatable { case spotify, logOnly, unavailable }
+
     // MARK: - Private
 
     private let bridge = SpotifyBridge()
@@ -94,9 +98,13 @@ final class PlaybackViewModel: ObservableObject {
         albumYear > 0 ? "\(album) (\(albumYear))" : album
     }
 
-    var isLikeAvailable: Bool {
-        (authService.oauthEnabled && authService.isConnected) || LoggingSettings.shared.loggingEnabled
+    var likeMode: LikeMode {
+        if authService.oauthEnabled && authService.isConnected { return .spotify }
+        if LoggingSettings.shared.isUsable { return .logOnly }
+        return .unavailable
     }
+
+    var isLikeAvailable: Bool { likeMode != .unavailable }
 
     // Adding to a playlist requires a live OAuth connection (logging-only is not enough).
     var isPlaylistAvailable: Bool {
@@ -153,8 +161,8 @@ final class PlaybackViewModel: ObservableObject {
 
     func toggleLike() {
         guard !currentTrackId.isEmpty else { return }
-        let oauthAvail = authService.oauthEnabled && authService.isConnected
-        let loggingAvail = LoggingSettings.shared.loggingEnabled
+        let oauthAvail = likeMode == .spotify
+        let loggingAvail = LoggingSettings.shared.isUsable
         guard oauthAvail || loggingAvail else { return }
 
         let wantLiked = !isLiked
