@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.0] - 2026-08-17
+
+### Harmonic v0.7.0 - Song Logging Indicator
+
+- **Database badge on like button** — when you use song logging and Spotify connection is not available or dropped, the like button now displays a small database icon to indicate that saving liked songs is done to the log only
+
 ## [0.6.1] - 2026-06-10
 
 ### Harmonic v0.6.1 - Playlist Refresh Improvements & Shortcut Fix
