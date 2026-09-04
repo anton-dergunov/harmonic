@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.0] - 2026-09-04
+
+### Harmonic v0.8.0 - Stays Connected to Spotify
+
+- **No more reconnecting after a reboot** — Harmonic used to lose its Spotify connection whenever it started before the network was ready, which happens most times you restart your Mac, and the only way back was connecting through the browser again. It now stays connected and reconnects on its own once the network is available. You are only asked to connect again if Spotify has actually revoked the authorization
+- **Reconnects after sleep and network drops** — losing Wi-Fi, switching networks, or waking the Mac no longer leaves the like button and playlists disabled until you restart the app
+- **Likes made while offline are no longer lost** — if you like or unlike a song while Spotify is unreachable, the heart stays as you left it and the change is sent as soon as the connection is back
+- **Settings shows what is going on** — the Spotify tab now says "Offline — reconnecting automatically" during an outage instead of silently showing a Connect button, and explains the reason when Spotify genuinely rejects the saved authorization
+
 ## [0.7.0] - 2026-08-17
 
 ### Harmonic v0.7.0 - Song Logging Indicator
