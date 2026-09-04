@@ -239,24 +239,35 @@ struct SettingsView: View {
     }
 
     private var connectRow: some View {
-        HStack(spacing: 10) {
-            if auth.isConnected {
-                Label("Connected", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.callout.weight(.medium))
-                Spacer()
-                Button("Disconnect", role: .destructive) { auth.disconnect() }
-                    .controlSize(.small)
-            } else {
-                Button(auth.isAuthenticating ? "Connecting…" : "Connect with Spotify") {
-                    Task { await auth.authorize() }
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 10) {
+                if auth.isConnected {
+                    Label("Connected", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.callout.weight(.medium))
+                    Spacer()
+                    Button("Disconnect", role: .destructive) { auth.disconnect() }
+                        .controlSize(.small)
+                } else {
+                    Button(auth.isAuthenticating ? "Connecting…" : "Connect with Spotify") {
+                        Task { await auth.authorize() }
+                    }
+                    .disabled(auth.clientId.isEmpty || auth.isAuthenticating)
+                    .buttonStyle(.borderedProminent)
+                    Spacer()
                 }
-                .disabled(auth.clientId.isEmpty || auth.isAuthenticating)
-                .buttonStyle(.borderedProminent)
-                Spacer()
+            }
+
+            if auth.isConnected && auth.isRefreshPending {
+                Text("Offline — reconnecting automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.top, 2)
+        // Opening Settings is a good moment to retry, so a stale connection
+        // repairs itself instead of sitting there looking broken.
+        .onAppear { auth.refreshNow() }
     }
 
     @ViewBuilder

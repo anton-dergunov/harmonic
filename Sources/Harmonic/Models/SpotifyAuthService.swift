@@ -18,26 +18,83 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     let scopes = "user-library-read user-library-modify playlist-read-private playlist-modify-private playlist-modify-public"
 
-    @Published var isConnected     = false
-    @Published var isAuthenticating = false
-    @Published var lastError:       String?
+    /// True while we hold credentials Spotify has not rejected. Deliberately stays
+    /// true through network outages: a refresh that fails because the machine is
+    /// offline is not a revoked authorization, and treating it as one is what used
+    /// to force a re-connect after every reboot.
+    @Published private(set) var isConnected = false
 
-    private var cachedToken: String?
-    private var tokenExpiry: Date = .distantPast
+    /// A refresh failed for a reason that looks temporary and a retry is queued.
+    @Published private(set) var isRefreshPending = false
+
+    @Published var isAuthenticating = false
+    @Published var lastError: String?
+
+    /// Fired after a refresh succeeds, so work parked during the outage can run.
+    var onReconnected: (() -> Void)?
+
+    private let store = SpotifyCredentialStore()
+    private var credentials: SpotifyCredentials?
+
+    // One in-flight refresh at a time. Several callers (like status, playlists)
+    // routinely ask for a token at the same moment; without this they'd each
+    // spend a request and race to rotate the refresh token.
+    private var refreshTask: Task<String?, Never>?
+
+    private var retryTask: Task<Void, Never>?
+    private var retryAttempt = 0
+    // Bounded backoff: a long outage costs a handful of requests per hour, not a flood.
+    private static let backoff: [TimeInterval] = [2, 5, 15, 60, 300, 900]
+
+    private var wakeObserver: NSObjectProtocol?
+
+    // waitsForConnectivity keeps a refresh issued a moment too early — login items
+    // start before Wi-Fi is up — queued instead of failing outright.
+    private static let tokenSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config)
+    }()
+
+    private let tokenEndpoint = URL(string: "https://accounts.spotify.com/api/token")!
 
     override init() {
         super.init()
-        isConnected = loadToken(key: "refreshToken") != nil
-        if isConnected {
-            Task { _ = await getValidToken() }
+        credentials = store.load()
+        isConnected = credentials != nil
+        observeRecoveryTriggers()
+        // No network call when the stored access token is still good — most
+        // relaunches then need no connectivity at all.
+        if isConnected, credentials?.isAccessTokenUsable != true {
+            scheduleRetry(after: 0)
         }
     }
 
     // MARK: - Public API
 
     func getValidToken() async -> String? {
-        if let t = cachedToken, tokenExpiry > Date().addingTimeInterval(60) { return t }
-        return await refreshAccessToken()
+        if let credentials, credentials.isAccessTokenUsable { return credentials.accessToken }
+        return await coalescedRefresh()
+    }
+
+    /// Retries outside the on-demand path — used by the recovery hooks and by the
+    /// Settings panel, so opening it never shows a stale "not connected" state.
+    func refreshNow() {
+        guard isConnected, !clientId.isEmpty else { return }
+        guard credentials?.isAccessTokenUsable != true else { return }
+        scheduleRetry(after: 0)
+    }
+
+    /// A 401 from the Web API means the access token died before its stated expiry
+    /// (revoked scope, server-side invalidation). Drop it so the next call refreshes
+    /// rather than retrying with a token we know is dead.
+    func invalidateAccessToken() {
+        guard var credentials else { return }
+        credentials.expiresAt = .distantPast
+        self.credentials = credentials
+        store.save(credentials)
     }
 
     func authorize() async {
@@ -85,18 +142,19 @@ final class SpotifyAuthService: NSObject, ObservableObject {
     }
 
     func disconnect() {
-        cachedToken = nil
-        tokenExpiry = .distantPast
-        deleteToken(key: "accessToken")
-        deleteToken(key: "refreshToken")
+        credentials = nil
+        store.clear()
+        cancelPendingWork()
         isConnected = false
+        isRefreshPending = false
+        retryAttempt = 0
         lastError = nil
     }
 
     // MARK: - Token exchange / refresh (PKCE)
 
     private func exchangeCode(_ code: String, verifier: String) async {
-        var req = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
+        var req = URLRequest(url: tokenEndpoint)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         req.httpBody = formEncode([
@@ -107,36 +165,46 @@ final class SpotifyAuthService: NSObject, ObservableObject {
             "code_verifier": verifier,
         ])
 
-        guard let (data, resp) = try? await URLSession.shared.data(for: req) else {
+        switch await SpotifyHTTP.send(req, session: Self.tokenSession) {
+        case .ok(let (data, response)):
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                lastError = "Could not parse token response"
+                return
+            }
+            guard let access  = json["access_token"]  as? String,
+                  let refresh = json["refresh_token"] as? String else {
+                lastError = "Missing tokens in response (HTTP \(response.statusCode))"
+                return
+            }
+            storeTokens(access: access, refresh: refresh,
+                        expiresIn: json["expires_in"] as? TimeInterval ?? 3600)
+            markConnected()
+        case .transient:
             lastError = "Network error during token exchange"
-            return
+        case .rejected(let rejection):
+            lastError = rejection.message.map { "Spotify error: \($0)" }
+                ?? "Token exchange failed (HTTP \(rejection.status))"
         }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            lastError = "Could not parse token response"
-            return
-        }
-        if let err = json["error"] as? String {
-            let desc = json["error_description"] as? String ?? ""
-            lastError = "Spotify error: \(err)\(desc.isEmpty ? "" : " — \(desc)")"
-            return
-        }
-        guard let access  = json["access_token"]  as? String,
-              let refresh = json["refresh_token"] as? String else {
-            lastError = "Missing tokens in response (HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0))"
-            return
-        }
-        storeTokens(access: access, refresh: refresh,
-                    expiresIn: json["expires_in"] as? TimeInterval ?? 3600)
-        isConnected = true
     }
 
-    private func refreshAccessToken() async -> String? {
-        guard let refresh = loadToken(key: "refreshToken"), !refresh.isEmpty,
-              !clientId.isEmpty else {
-            isConnected = false
+    private func coalescedRefresh() async -> String? {
+        if let refreshTask { return await refreshTask.value }
+        let task = Task { [weak self] () -> String? in
+            await self?.performRefresh() ?? nil
+        }
+        refreshTask = task
+        let token = await task.value
+        refreshTask = nil
+        return token
+    }
+
+    private func performRefresh() async -> String? {
+        guard let refresh = credentials?.refreshToken, !refresh.isEmpty, !clientId.isEmpty else {
+            markRejected("Spotify authorization is missing — please connect again.")
             return nil
         }
-        var req = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
+
+        var req = URLRequest(url: tokenEndpoint)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         req.httpBody = formEncode([
@@ -145,24 +213,111 @@ final class SpotifyAuthService: NSObject, ObservableObject {
             "client_id":     clientId,
         ])
 
-        guard let (data, _) = try? await URLSession.shared.data(for: req),
-              let json   = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let access = json["access_token"] as? String else {
-            isConnected = false
+        switch await SpotifyHTTP.send(req, session: Self.tokenSession) {
+        case .ok(let (data, _)):
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let access = json["access_token"] as? String else {
+                // A 200 we can't parse is not Spotify answering — a captive portal
+                // or proxy is in the way. Worth retrying, not worth disconnecting.
+                markTransient()
+                return nil
+            }
+            // Spotify rotates the refresh token on most refreshes and invalidates
+            // the old one, so whatever comes back has to be kept.
+            storeTokens(access: access,
+                        refresh: json["refresh_token"] as? String ?? refresh,
+                        expiresIn: json["expires_in"] as? TimeInterval ?? 3600)
+            markConnected()
+            return access
+
+        case .transient:
+            markTransient()
+            return nil
+
+        case .rejected(let rejection):
+            // Only a genuine OAuth error body proves the credentials are dead. An
+            // opaque 4xx is far more likely to be something between us and Spotify.
+            guard let message = rejection.message else {
+                markTransient()
+                return nil
+            }
+            markRejected("Spotify rejected the saved authorization (\(message)). Please connect again.")
             return nil
         }
-        storeTokens(access: access,
-                    refresh: json["refresh_token"] as? String ?? refresh,
-                    expiresIn: json["expires_in"] as? TimeInterval ?? 3600)
-        isConnected = true
-        return access
     }
 
     private func storeTokens(access: String, refresh: String, expiresIn: TimeInterval) {
-        cachedToken = access
-        tokenExpiry = Date().addingTimeInterval(expiresIn)
-        saveToken(value: access,  key: "accessToken")
-        saveToken(value: refresh, key: "refreshToken")
+        let credentials = SpotifyCredentials(
+            accessToken:  access,
+            refreshToken: refresh,
+            expiresAt:    Date().addingTimeInterval(expiresIn)
+        )
+        self.credentials = credentials
+        // Atomic write: the rotated refresh token is on disk before this returns.
+        store.save(credentials)
+    }
+
+    // MARK: - Connection state
+
+    private func markConnected() {
+        isConnected = true
+        isRefreshPending = false
+        lastError = nil
+        retryAttempt = 0
+        retryTask?.cancel()
+        retryTask = nil
+        onReconnected?()
+    }
+
+    private func markTransient() {
+        isRefreshPending = true
+        scheduleRetry(after: Self.backoff[min(retryAttempt, Self.backoff.count - 1)])
+        retryAttempt += 1
+    }
+
+    private func markRejected(_ message: String) {
+        credentials = nil
+        store.clear()
+        cancelPendingWork()
+        isConnected = false
+        isRefreshPending = false
+        retryAttempt = 0
+        lastError = message
+    }
+
+    private func scheduleRetry(after delay: TimeInterval) {
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+            }
+            guard let self, self.isConnected else { return }
+            _ = await self.coalescedRefresh()
+        }
+    }
+
+    private func cancelPendingWork() {
+        retryTask?.cancel()
+        retryTask = nil
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    // MARK: - Recovery triggers
+
+    private func observeRecoveryTriggers() {
+        // The primary post-reboot fix: retry the instant the interface comes up.
+        NetworkMonitor.shared.onCameOnline { [weak self] in
+            self?.refreshNow()
+        }
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshNow() }
+        }
     }
 
     // MARK: - Helpers
@@ -187,20 +342,6 @@ final class SpotifyAuthService: NSObject, ObservableObject {
 
     private func codeChallenge(for verifier: String) -> String {
         Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncoded()
-    }
-
-    // MARK: - Token persistence
-
-    private func saveToken(value: String, key: String) {
-        UserDefaults.standard.set(value, forKey: "harmonic.oauth.\(key)")
-    }
-
-    private func loadToken(key: String) -> String? {
-        UserDefaults.standard.string(forKey: "harmonic.oauth.\(key)")
-    }
-
-    private func deleteToken(key: String) {
-        UserDefaults.standard.removeObject(forKey: "harmonic.oauth.\(key)")
     }
 }
 

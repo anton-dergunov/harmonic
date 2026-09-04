@@ -50,6 +50,7 @@ final class PlaybackViewModel: ObservableObject {
     private let likeService = SpotifyLikeService()
     private let playlistService = SpotifyPlaylistService()
     private let logger = SongLogger()
+    private let pendingLikes = PendingLikeQueue()
     let authService = SpotifyAuthService()
 
     private(set) var currentTrackId = ""
@@ -84,6 +85,10 @@ final class PlaybackViewModel: ObservableObject {
         loggingCancellable = LoggingSettings.shared.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
+        // Likes made while Spotify was unreachable go out as soon as it is again.
+        authService.onReconnected = { [weak self] in self?.flushPendingLikes() }
+        NetworkMonitor.shared.onCameOnline { [weak self] in self?.flushPendingLikes() }
+        flushPendingLikes()
         isSpotifyRunning = bridge.isRunning()
         if isSpotifyRunning {
             bridge.queryCurrentState()
@@ -179,15 +184,35 @@ final class PlaybackViewModel: ObservableObject {
 
         guard oauthAvail else { return }
         let trackId = currentTrackId
+        let snap = (song: song, artist: artist)
         Task { [weak self] in
             guard let self else { return }
-            let actual = await likeService.setLike(trackId: trackId, wantLiked: wantLiked)
+            let outcome = await likeService.setLike(trackId: trackId, wantLiked: wantLiked)
             guard self.likeActionVersion == myVersion else { return }
-            if let actual = actual {
+            switch outcome {
+            case .ok(let actual):
                 self.isLiked = actual
-            } else {
+            case .transient:
+                // Spotify is unreachable. Keep the heart as the user left it and
+                // send the change once the connection is back.
+                self.pendingLikes.enqueue(
+                    PendingLike(trackId: trackId, wantLiked: wantLiked,
+                                track: snap.song, artist: snap.artist, queuedAt: Date())
+                )
+            case .rejected:
                 self.isLiked = !wantLiked  // revert optimistic update on failure
                 self.likeShakeCount += 1
+            }
+        }
+    }
+
+    private func flushPendingLikes() {
+        guard !pendingLikes.isEmpty, likeMode == .spotify else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.pendingLikes.flush { [weak self] entry in
+                guard let self else { return .transient }
+                return await self.likeService.setLike(trackId: entry.trackId, wantLiked: entry.wantLiked)
             }
         }
     }
@@ -247,7 +272,7 @@ final class PlaybackViewModel: ObservableObject {
                     )
                 }
                 if RecentPlaylistSettings.shared.likeWhenAdding && !self.isLiked {
-                    if await self.likeService.setLike(trackId: trackId, wantLiked: true) != nil {
+                    if case .ok = await self.likeService.setLike(trackId: trackId, wantLiked: true) {
                         self.isLiked = true
                     }
                 }

@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:harmonic}",
+            "name": "Debug Harmonic",
+            "target": "Harmonic",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Harmonic"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:harmonic}",
+            "name": "Release Harmonic",
+            "target": "Harmonic",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Harmonic"
+        }
+    ]
+}
