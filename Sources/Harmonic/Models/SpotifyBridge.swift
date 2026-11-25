@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import os
 
 struct SpotifyTrackInfo {
     let name: String
@@ -26,6 +27,10 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
 
     private var distributedObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
+    // Track whose year and artwork URL were last asked for by AppleScript.
+    // Play, pause and seek notifications for the same track carry everything
+    // else, so they need no query.
+    private var lastQueriedTrackId = ""
 
     override init() {
         super.init()
@@ -147,6 +152,7 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
                     as? NSRunningApplication,
                 app.bundleIdentifier == "com.spotify.client"
             else { return }
+            self?.lastQueriedTrackId = ""
             self?.onRunningChanged?(false)
         }
 
@@ -191,7 +197,9 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         ))
         onStateChanged?(state)
 
-        if !name.isEmpty {
+        // Only a new track needs the follow-up query (for the year and artwork).
+        if !name.isEmpty && trackId != lastQueriedTrackId {
+            lastQueriedTrackId = trackId
             Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 await self?.fetchAndDispatchState()
@@ -266,6 +274,7 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
         // Spotify AppleScript returns duration in milliseconds.
         let duration = rawDur / 1000.0
         let trackId  = rawURI.components(separatedBy: ":").last ?? ""
+        if !name.isEmpty { lastQueriedTrackId = trackId }
 
         let state: SpotifyPlayerState
         switch stateStr.lowercased() {
@@ -291,6 +300,9 @@ final class SpotifyBridge: NSObject, @unchecked Sendable {
 private func osascript(_ script: String) async -> String? {
     await withCheckedContinuation { continuation in
         Task.detached(priority: .utility) {
+            #if DEBUG
+            osascriptLog.debug("osascript: \(script.split(separator: "\n").prefix(2).joined(separator: " / "), privacy: .public)")
+            #endif
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             process.arguments     = ["-e", script]
@@ -310,3 +322,9 @@ private func osascript(_ script: String) async -> String? {
         }
     }
 }
+
+#if DEBUG
+private let osascriptLog = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "Harmonic", category: "osascript"
+)
+#endif

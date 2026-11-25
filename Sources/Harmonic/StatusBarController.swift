@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import os
 import SwiftUI
 
 @MainActor
@@ -20,6 +21,11 @@ final class StatusBarController: NSObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var previousApp: NSRunningApplication?
+
+    // Replicant dimming: observers and the pending re-checks after an event.
+    private var dimmingObservers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var dimmingMouseMonitor: Any?
+    private var dimmingRecheck: DispatchWorkItem?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: 150)
@@ -74,13 +80,53 @@ final class StatusBarController: NSObject {
     private func startInactiveDisplayDimming() {
         dimInactiveDisplayReplicants()
 
-        // The replicant is recreated whenever the active display changes, resetting
-        // its alpha. Poll so we re-dim each freshly created replicant; the replicant
-        // only exists on inactive displays, so there is nothing to restore.
-        Timer.publish(every: 1.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.dimInactiveDisplayReplicants() }
+        // The replicant is recreated whenever the active display changes, which
+        // resets its alpha, so re-dim after anything that can move the active
+        // menu bar or redraw it. The replicant only exists on inactive displays,
+        // so there is nothing to restore.
+        let app = NotificationCenter.default
+        let workspace = NSWorkspace.shared.notificationCenter
+        let events: [(NotificationCenter, Notification.Name)] = [
+            (app, NSApplication.didChangeScreenParametersNotification),
+            (app, NSWindow.didChangeScreenNotification),
+            (app, NSWindow.didChangeOcclusionStateNotification),
+            (workspace, NSWorkspace.activeSpaceDidChangeNotification),
+            (workspace, NSWorkspace.didActivateApplicationNotification),
+        ]
+        dimmingObservers = events.map { center, name in
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.scheduleReplicantDimming() }
+            }
+            return (center, token)
+        }
+
+        // Clicking a window on another display makes that display's menu bar the
+        // active one without any app being activated. Mouse-down monitors need
+        // no Accessibility permission.
+        dimmingMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleReplicantDimming() }
+        }
+
+        // The snapshot is retaken when the item's content changes.
+        playback.$song
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.scheduleReplicantDimming() }
             .store(in: &cancellables)
+    }
+
+    /// Dims now, then checks again shortly after, since the system creates the
+    /// replicant a moment after the event. A new event restarts the re-checks.
+    private func scheduleReplicantDimming() {
+        dimInactiveDisplayReplicants()
+        dimmingRecheck?.cancel()
+        let recheck = DispatchWorkItem { [weak self] in
+            self?.dimInactiveDisplayReplicants()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                self?.dimInactiveDisplayReplicants()
+            }
+        }
+        dimmingRecheck = recheck
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: recheck)
     }
 
     private func dimInactiveDisplayReplicants() {
@@ -89,8 +135,15 @@ final class StatusBarController: NSObject {
                   let replicant = findView(in: contentView, classNameContains: "ReplicantView"),
                   replicant.alphaValue != Self.inactiveDisplayAlpha else { continue }
             replicant.alphaValue = Self.inactiveDisplayAlpha
+            #if DEBUG
+            Self.log.debug("Dimmed a menu bar replicant")
+            #endif
         }
     }
+
+    private static let log = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Harmonic", category: "replicant"
+    )
 
     private static let inactiveDisplayAlpha: CGFloat = 0.5
 
@@ -366,6 +419,7 @@ final class StatusBarController: NSObject {
 
         window.setFrameOrigin(NSPoint(x: x, y: y))
         window.makeKeyAndOrderFront(nil)
+        playback.startClock()
 
         startGlobalMonitor()
     }
@@ -373,6 +427,7 @@ final class StatusBarController: NSObject {
     private func hidePlayerWindow() {
         lastHideTime = CACurrentMediaTime()
         playerWindow?.orderOut(nil)
+        playback.stopClock()
         stopGlobalMonitor()
     }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- **Uses much less CPU while music plays** — Harmonic no longer redraws the menu bar every second and asks Spotify for updates far less often, so it stays almost idle while a song plays
+
 ## [0.8.0] - 2026-09-04
 
 ### Harmonic v0.8.0 - Stays Connected to Spotify

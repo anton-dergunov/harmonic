@@ -17,7 +17,20 @@ final class PlaybackViewModel: ObservableObject {
 
     @Published var isPlaying = false
     @Published var isLiked = false
-    @Published var progress: TimeInterval = 0
+
+    // The playback position is not published: publishing it every second would
+    // redraw every view that observes this model, the menu bar item included.
+    // It is computed from the last known position and when it was known, and
+    // `clock` republishes it once a second only while the player window is open.
+    private var anchorPosition: TimeInterval = 0
+    private var anchorTime = CACurrentMediaTime()
+    let clock = PlaybackClock()
+
+    var progress: TimeInterval {
+        var position = anchorPosition
+        if isPlaying { position += CACurrentMediaTime() - anchorTime }
+        return duration > 0 ? min(max(0, position), duration) : max(0, position)
+    }
 
     // MARK: - UI state
 
@@ -61,8 +74,7 @@ final class PlaybackViewModel: ObservableObject {
     // Without this, slow web responses can clobber recent user clicks.
     private var likeActionVersion = 0
 
-    private var displayTimer: AnyCancellable?
-    private var positionSyncTimer: AnyCancellable?
+    private var clockTimer: AnyCancellable?
     private var authServiceCancellable: AnyCancellable?
     private var loggingCancellable: AnyCancellable?
 
@@ -93,8 +105,6 @@ final class PlaybackViewModel: ObservableObject {
         if isSpotifyRunning {
             bridge.queryCurrentState()
         }
-        startDisplayTimer()
-        startPositionSyncTimer()
     }
 
     // MARK: - Computed
@@ -116,14 +126,10 @@ final class PlaybackViewModel: ObservableObject {
         authService.oauthEnabled && authService.isConnected
     }
 
-    var progressFraction: Double {
-        guard duration > 0 else { return 0 }
-        return min(1, max(0, progress / duration))
-    }
-
     // MARK: - Commands
 
     func togglePlayPause() {
+        let position = progress
         if isPlaying {
             bridge.pause()
             isPlaying = false
@@ -131,6 +137,7 @@ final class PlaybackViewModel: ObservableObject {
             bridge.play()
             isPlaying = true
         }
+        setPosition(position)
         if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
             logger.logPlayPause(
                 track: song, artist: artist, trackId: currentTrackId,
@@ -157,7 +164,7 @@ final class PlaybackViewModel: ObservableObject {
     func seek(fraction: Double) {
         let from = progress
         let target = duration * min(1, max(0, fraction))
-        progress = target
+        setPosition(target)
         bridge.seek(to: target)
         if LoggingSettings.shared.loggingEnabled && !currentTrackId.isEmpty {
             logger.logSeek(track: song, artist: artist, trackId: currentTrackId, fromS: Int(from), toS: Int(target))
@@ -465,14 +472,20 @@ final class PlaybackViewModel: ObservableObject {
         switch state {
         case .playing(let position):
             isPlaying = true
-            progress  = position
+            setPosition(position)
         case .paused(let position):
             isPlaying = false
-            progress  = position
+            setPosition(position)
         case .stopped:
             isPlaying = false
-            progress  = 0
+            setPosition(0)
         }
+    }
+
+    private func setPosition(_ position: TimeInterval) {
+        anchorPosition = position
+        anchorTime = CACurrentMediaTime()
+        if clockTimer != nil { clock.position = progress }
     }
 
     private func resetToIdle() {
@@ -481,8 +494,8 @@ final class PlaybackViewModel: ObservableObject {
         album             = ""
         albumYear         = 0
         duration          = 0
-        progress          = 0
         isPlaying         = false
+        setPosition(0)
         isLiked           = false
         likeStatusFetched = false
         coverImage        = nil
@@ -490,30 +503,32 @@ final class PlaybackViewModel: ObservableObject {
         currentTrackId    = ""
     }
 
-    private func startDisplayTimer() {
-        displayTimer = Timer.publish(every: 1, on: .main, in: .common)
+    // MARK: - Clock (player window only)
+
+    /// Starts republishing the position once a second, for the player window's
+    /// scrubber. Also asks Spotify for the exact position once, to correct drift.
+    func startClock() {
+        clock.position = progress
+        guard clockTimer == nil else { return }
+        clockTimer = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self, isPlaying else { return }
-                if duration <= 0 || progress < duration {
-                    progress += 1
-                } else {
-                    progress = 0
-                }
+                clock.position = progress
             }
+        guard isSpotifyRunning else { return }
+        Task { [weak self] in
+            guard let self, let position = await bridge.queryPosition() else { return }
+            self.setPosition(position)
+        }
     }
 
-    private func startPositionSyncTimer() {
-        positionSyncTimer = Timer.publish(every: 30, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self, isSpotifyRunning, isPlaying else { return }
-                Task { [weak self] in
-                    guard let self else { return }
-                    if let pos = await bridge.queryPosition() {
-                        self.progress = pos
-                    }
-                }
-            }
+    func stopClock() {
+        clockTimer = nil
     }
+}
+
+@MainActor
+final class PlaybackClock: ObservableObject {
+    @Published var position: TimeInterval = 0
 }

@@ -277,19 +277,8 @@ struct PlayerPopoverView: View {
     }
 
     private var bottomScrubber: some View {
-        VStack(spacing: 4) {
-            PlaybackScrubber(
-                fraction: playback.progressFraction,
-                onSeek: { playback.seek(fraction: $0) }
-            )
-
-            HStack {
-                Text(TimeFormatting.format(playback.progress))
-                Spacer()
-                Text(TimeFormatting.format(playback.duration))
-            }
-            .font(.system(size: 10, weight: .regular, design: .monospaced))
-            .foregroundStyle(PlayerTheme.controlForegroundMuted)
+        ScrubberSection(clock: playback.clock, duration: playback.duration) {
+            playback.seek(fraction: $0)
         }
     }
 
@@ -358,6 +347,33 @@ private struct ControlIconButton<Label: View>: View {
 }
 
 // MARK: - PlaybackScrubber
+
+// MARK: - ScrubberSection
+
+// Observes only the clock, so the once-a-second position updates redraw the
+// scrubber and the times, not the whole player.
+private struct ScrubberSection: View {
+    @ObservedObject var clock: PlaybackClock
+    let duration: TimeInterval
+    let onSeek: (Double) -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            PlaybackScrubber(
+                fraction: duration > 0 ? min(1, max(0, clock.position / duration)) : 0,
+                onSeek: onSeek
+            )
+
+            HStack {
+                Text(TimeFormatting.format(clock.position))
+                Spacer()
+                Text(TimeFormatting.format(duration))
+            }
+            .font(.system(size: 10, weight: .regular, design: .monospaced))
+            .foregroundStyle(PlayerTheme.controlForegroundMuted)
+        }
+    }
+}
 
 private struct PlaybackScrubber: View {
     let fraction: Double
