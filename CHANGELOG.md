@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.1] - 2026-11-25
+
+### Harmonic v0.8.1 - Lighter on CPU
 
 - **Uses much less CPU while music plays** — Harmonic no longer redraws the menu bar every second and asks Spotify for updates far less often, so it stays almost idle while a song plays
 
